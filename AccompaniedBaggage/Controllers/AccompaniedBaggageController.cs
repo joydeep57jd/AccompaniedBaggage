@@ -174,5 +174,38 @@ namespace SezApi.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+
+
+        [HttpGet("GetExaminationAsync")]
+        public async Task<IActionResult> GetExaminationAsync(int? examinationId, int? page, int? size)
+        {
+
+            var response = await _services.GetExaminationAsync(examinationId, page, size);
+
+            if (response.Data == null || !response.Data.Any())
+            {
+                return NotFound(new { message = "No entries found." });
+            }
+
+            return Ok(response);
+        }
+
+        [HttpPost("AddEditExaminationAsync")]
+        public async Task<IActionResult> AddEditExaminationAsync(RequestExamination request)
+        {
+            if (request == null)
+            {
+                return BadRequest("Request data is required.");
+            }
+            try
+            {
+                var result = await _services.AddEditExaminationAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
     }
 }

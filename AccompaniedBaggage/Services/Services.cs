@@ -562,5 +562,134 @@ namespace SezApi.Services
             return response;
         }
 
+        public async Task<Response<List<ResponseExamination>>> GetExaminationAsync(int? examinationId, int? page, int? size)
+        {
+            var response = new Response<List<ResponseExamination>>();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "SP_GetExamination";
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.Parameters.Add(new SqlParameter("@Examination_id", examinationId ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@page", page ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@size", size ?? (object)DBNull.Value));
+
+                using var reader = await command.ExecuteReaderAsync();
+
+                int totalCount = 0;
+                if (await reader.ReadAsync())
+                {
+                    totalCount = reader.GetInt32(0);
+                }
+
+                await reader.NextResultAsync();
+
+                var data = new List<ResponseExamination>();
+                while (await reader.ReadAsync())
+                {
+                    data.Add(new ResponseExamination
+                    {
+                        Examination_id = reader.GetInt32(reader.GetOrdinal("Examination_id")),
+                        Receive_id = reader["Receive_id"] as int?,
+                        Examination_date = reader["Examination_date"] as DateTime?,
+                        Colour = reader["Colour"] as string,
+                        Colour_code = reader["Colour_code"] as string,
+                        Weight_kg = reader["Weight_kg"] as decimal?,
+                        Size = reader["Size"] as string,
+                        Length = reader["Length"] as decimal?,
+                        Width = reader["Width"] as decimal?,
+                        Height = reader["Height"] as decimal?,
+                        Cargo_type = reader["Cargo_type"] as string,
+                        Stored_location = reader["Stored_location"] as string,
+                        Remarks = reader["Remarks"] as string,
+                        CreatedDate = reader["CreatedDate"] as DateTime?,
+                        CreatedBy = reader["CreatedBy"] as string,
+                        UpdatedDate = reader["UpdatedDate"] as DateTime?,
+                        UpdatedBy = reader["UpdatedBy"] as string
+                    });
+                }
+
+                response.Data = data;
+                response.TotalCount = totalCount;
+                response.Status = true;
+            }
+            catch (Exception ex)
+            {
+                response.Status = false;
+                response.Message = $"Error: {ex.Message}";
+                response.Data = new List<ResponseExamination>();
+            }
+
+            return response;
+        }
+
+        public async Task<Response<AddEditResponse>> AddEditExaminationAsync(RequestExamination request)
+        {
+            var response = new Response<AddEditResponse>();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "SP_AddEditExamination";
+                command.CommandType = CommandType.StoredProcedure;
+
+                void AddParameter(string name, object value)
+                {
+                    var param = command.CreateParameter();
+                    param.ParameterName = name;
+                    param.Value = value ?? DBNull.Value;
+                    command.Parameters.Add(param);
+                }
+
+                AddParameter("@Examination_id", request.Examination_id);
+                AddParameter("@Receive_id", request.Receive_id);
+                AddParameter("@Examination_date", request.Examination_date);
+                AddParameter("@Colour", request.Colour);
+                AddParameter("@Colour_code", request.Colour_code);
+                AddParameter("@Weight_kg", request.Weight_kg);
+                AddParameter("@Size", request.Size);
+                AddParameter("@Length", request.Length);
+                AddParameter("@Width", request.Width);
+                AddParameter("@Height", request.Height);
+                AddParameter("@Cargo_type", request.Cargo_type);
+                AddParameter("@Stored_location", request.Stored_location);
+                AddParameter("@Remarks", request.Remarks);
+                AddParameter("@CreatedBy", request.CreatedBy);
+                AddParameter("@UpdatedBy", request.UpdatedBy);
+
+                int resultId = 0;
+
+                using var reader = await command.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    resultId = Convert.ToInt32(reader[0]);
+                }
+
+                response.Data = new AddEditResponse
+                {
+                    Response = request.Examination_id == 0 ? "Inserted successfully" : "Updated successfully"
+                };
+                response.Status = true;
+            }
+            catch (Exception ex)
+            {
+                response.Data = new AddEditResponse
+                {
+                    Response = $"Error: {ex.Message}"
+                };
+                response.Status = false;
+            }
+
+            return response;
+        }
+
     }
 }
