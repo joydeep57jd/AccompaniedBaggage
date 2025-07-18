@@ -3,6 +3,7 @@ using AccompaniedBaggage.Model.Response;
 using Azure.Core;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using SezApi.Controllers;
 using SezApi.Data;
 using SezApi.Model.Request;
 using SezApi.Model.Response;
@@ -12,10 +13,11 @@ namespace SezApi.Services
     public class Services : IServices
     {
         private readonly AccompaniedBaggageDbContext _db;
-
-        public Services(AccompaniedBaggageDbContext db)
+        private readonly ILogger<Services> _logger;
+        public Services(AccompaniedBaggageDbContext db, ILogger<Services> logger)
         {
             _db = db;
+            _logger = logger;
         }
 
         public async Task<Response<List<ResponseMstEximTraderMaster>>> GetMstParty(int? page, int? size, string? partyType)
@@ -93,6 +95,7 @@ namespace SezApi.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError("StackTrace: {StackTrace}", ex.StackTrace);
                 response.Data = new List<ResponseMstEximTraderMaster>();
                 response.Status = false;
                 response.Message = $"Error: {ex.Message}";
@@ -152,6 +155,7 @@ namespace SezApi.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError("StackTrace: {StackTrace}", ex.StackTrace);
                 response.Data = new List<ResponseMstSac>();
                 response.Status = false;
                 response.Message = $"Error: {ex.Message}";
@@ -198,6 +202,7 @@ namespace SezApi.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError("StackTrace: {StackTrace}", ex.StackTrace);
                 throw new ApplicationException("Failed to execute SP_AddMstSac", ex);
             }
 
@@ -264,6 +269,7 @@ namespace SezApi.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError("StackTrace: {StackTrace}", ex.StackTrace);
                 throw new ApplicationException("Failed to execute SP_AddMstEximTraderMaster", ex);
             }
 
@@ -320,6 +326,7 @@ namespace SezApi.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError("StackTrace: {StackTrace}", ex.StackTrace);
                 response.Data = new List<ResponseMstStorageCharge>();
                 response.Status = false;
                 response.Message = $"Error: {ex.Message}";
@@ -365,6 +372,7 @@ namespace SezApi.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError("StackTrace: {StackTrace}", ex.StackTrace);
                 throw new ApplicationException("Failed to execute SP_AddEditMstStorageCharge", ex);
             }
 
@@ -419,6 +427,7 @@ namespace SezApi.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError("StackTrace: {StackTrace}", ex.StackTrace);
                 response.Data = new List<ResponseMstHandlingCharge>();
                 response.Status = false;
                 response.Message = $"Error: {ex.Message}";
@@ -462,6 +471,7 @@ namespace SezApi.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError("StackTrace: {StackTrace}", ex.StackTrace);
                 throw new ApplicationException("Failed to execute SP_AddEditMstHandlingCharge", ex);
             }
 
@@ -516,6 +526,7 @@ namespace SezApi.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError("StackTrace: {StackTrace}", ex.StackTrace);
                 response.Status = false;
                 response.Message = $"Error: {ex.Message}";
                 response.Data = new List<ResponseMstGodown>();
@@ -556,6 +567,7 @@ namespace SezApi.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError("StackTrace: {StackTrace}", ex.StackTrace);
                 throw new ApplicationException("Failed to execute SP_AddEditMstGodown", ex);
             }
 
@@ -620,6 +632,7 @@ namespace SezApi.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError("StackTrace: {StackTrace}", ex.StackTrace);
                 response.Status = false;
                 response.Message = $"Error: {ex.Message}";
                 response.Data = new List<ResponseExamination>();
@@ -681,6 +694,7 @@ namespace SezApi.Services
             }
             catch (Exception ex)
             {
+                _logger.LogError("StackTrace: {StackTrace}", ex.StackTrace);
                 response.Data = new AddEditResponse
                 {
                     Response = $"Error: {ex.Message}"
