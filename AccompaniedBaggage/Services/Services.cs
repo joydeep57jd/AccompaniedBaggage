@@ -705,5 +705,133 @@ namespace SezApi.Services
             return response;
         }
 
+        public async Task<Response<List<ResponseReceiptDetails>>> GetReceiptDetails(int? ReceiptId, int? page, int? size)
+        {
+            var response = new Response<List<ResponseReceiptDetails>>();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "Sp_GetReceiptDetails";
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.Parameters.Add(new SqlParameter("@ReceiptId", ReceiptId ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@page", page ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@size", size ?? (object)DBNull.Value));
+
+                using var reader = await command.ExecuteReaderAsync();
+
+                int totalCount = 0;
+                if (await reader.ReadAsync())
+                {
+                    totalCount = reader.GetInt32(0);
+                }
+
+                await reader.NextResultAsync();
+
+                var data = new List<ResponseReceiptDetails>();
+                while (await reader.ReadAsync())
+                {
+                    data.Add(new ResponseReceiptDetails
+                    {
+                        ReceiptId = reader.GetInt32(reader.GetOrdinal("ReceiptId")),
+                        ReceiptNo = reader["ReceiptNo"] as string,
+                        ReceiptDate = reader["ReceiptDate"] as DateTime?,
+                        From = reader["From"] as string,
+                        DrNo = reader["DrNo"] as string,
+                        AocNo = reader["AocNo"] as string,
+                        DateOfLanding = reader["DateOfLanding"] as DateTime?,
+                        PassportNo = reader["PassportNo"] as string,
+                        FlightNo = reader["FlightNo"] as string,
+                        IsSealed = reader["IsSealed"] as string,
+                        Remarks = reader["Remarks"] as string,
+                        ReasonForDetention = reader["ReasonForDetention"] as string,
+                        CreatedDate = reader["CreatedDate"] as DateTime?,
+                        UpdatedDate = reader["UpdatedDate"] as DateTime?,
+                        CreatedBy = reader["CreatedBy"] as string,
+                        UpdatedBy = reader["UpdatedBy"] as string
+                    });
+                }
+
+                response.Data = data;
+                response.TotalCount = totalCount;
+                response.Status = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in GetReceiptDetailsAsync: {Message}", ex.Message);
+                response.Status = false;
+                response.Message = $"Error: {ex.Message}";
+                response.Data = new List<ResponseReceiptDetails>();
+            }
+
+            return response;
+        }
+
+        public async Task<Response<AddEditResponse>> AddEditReceiptDetailsAsync(RequestReceiptDetails request)
+        {
+            var response = new Response<AddEditResponse>();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "SP_AddEditReceiptDetails";
+                command.CommandType = CommandType.StoredProcedure;
+
+                void AddParameter(string name, object value)
+                {
+                    var param = command.CreateParameter();
+                    param.ParameterName = name;
+                    param.Value = value ?? DBNull.Value;
+                    command.Parameters.Add(param);
+                }
+
+                AddParameter("@ReceiptId", request.ReceiptId);
+                AddParameter("@ReceiptDate", request.ReceiptDate);
+                AddParameter("@From", request.From);
+                AddParameter("@DrNo", request.DrNo);
+                AddParameter("@AocNo", request.AocNo);
+                AddParameter("@DateOfLanding", request.DateOfLanding);
+                AddParameter("@PassportNo", request.PassportNo);
+                AddParameter("@FlightNo", request.FlightNo);
+                AddParameter("@IsSealed", request.IsSealed);
+                AddParameter("@Remarks", request.Remarks);
+                AddParameter("@ReasonForDetention", request.ReasonForDetention);
+                AddParameter("@CreatedBy", request.CreatedBy);
+                AddParameter("@UpdatedBy", request.UpdatedBy);
+
+                int resultId = 0;
+
+                using var reader = await command.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    resultId = Convert.ToInt32(reader[0]);
+                }
+
+                response.Data = new AddEditResponse
+                {
+                    Response = request.ReceiptId == 0 ? "Inserted successfully" : "Updated successfully"
+                };
+                response.Status = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("StackTrace: {StackTrace}", ex.StackTrace);
+                response.Data = new AddEditResponse
+                {
+                    Response = $"Error: {ex.Message}"
+                };
+                response.Status = false;
+            }
+
+            return response;
+        }
+
     }
 }

@@ -207,5 +207,38 @@ namespace SezApi.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+
+        [HttpGet("GetReceiptDetails")]
+        public async Task<IActionResult> GetReceiptDetails(int? ReceiptId, int? page, int? size)
+        {
+
+            var response = await _services.GetReceiptDetails(ReceiptId, page, size);
+
+            if (response.Data == null || !response.Data.Any())
+            {
+                return NotFound(new { message = "No entries found." });
+            }
+
+            return Ok(response);
+        }
+
+
+        [HttpPost("AddEditReceiptDetailsAsync")]
+        public async Task<IActionResult> AddEditReceiptDetailsAsync(RequestReceiptDetails request)
+        {
+            if (request == null)
+            {
+                return BadRequest("Request data is required.");
+            }
+            try
+            {
+                var result = await _services.AddEditReceiptDetailsAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
     }
 }

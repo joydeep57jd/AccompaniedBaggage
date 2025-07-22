@@ -19,5 +19,8 @@ namespace SezApi.Services
         Task<AddEditResponse> AddEditGodownAsync(RequestMstGodown request);
         Task<Response<List<ResponseExamination>>> GetExaminationAsync(int? examinationId, int? page, int? size);
         Task<Response<AddEditResponse>> AddEditExaminationAsync(RequestExamination request);
+
+        Task<Response<List<ResponseReceiptDetails>>> GetReceiptDetails(int? ReceiptId, int? page, int? size);
+        Task<Response<AddEditResponse>> AddEditReceiptDetailsAsync(RequestReceiptDetails request);
     }
 }
