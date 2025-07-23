@@ -833,5 +833,144 @@ namespace SezApi.Services
             return response;
         }
 
+        public async Task<Response<List<ResponseBaggageClaim>>> GetBaggageClaimAsync(int? claimId, int? page, int? size)
+        {
+            var response = new Response<List<ResponseBaggageClaim>>();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "GetAB_Baggage_claim";
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.Parameters.Add(new SqlParameter("@Claim_id", claimId ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@page", page ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@size", size ?? (object)DBNull.Value));
+
+                using var reader = await command.ExecuteReaderAsync();
+
+                int totalCount = 0;
+                if (await reader.ReadAsync())
+                {
+                    totalCount = reader.GetInt32(0);
+                }
+
+                await reader.NextResultAsync();
+
+                var data = new List<ResponseBaggageClaim>();
+                while (await reader.ReadAsync())
+                {
+                    data.Add(new ResponseBaggageClaim
+                    {
+                        Claim_id = reader.GetInt32(reader.GetOrdinal("Claim_id")),
+                        Claim_no = reader["Claim_no"] as string,
+                        Claim_date = reader["Claim_date"] as DateTime?,
+                        Party_id = reader["Party_id"] as decimal?,
+                        Party_name = reader["Party_name"] as string,
+                        Passport_no = reader["Passport_no"] as string,
+                        Name = reader["Name"] as string,
+                        AOC_DR_no = reader["AOC_DR_no"] as string,
+                        Receive_id = reader["Receive_id"] as int?,
+                        Baggage_receipt_no = reader["Baggage_receipt_no"] as string,
+                        Baggage_receipt_date = reader["Baggage_receipt_date"] as DateTime?,
+                        Remarks = reader["Remarks"] as string,
+                        CreatedBy = reader["CreatedBy"] as string,
+                        CreatedDate = reader["CreatedDate"] as DateTime?,
+                        UpdatedBy = reader["UpdatedBy"] as string,
+                        UpdatedDate = reader["UpdatedDate"] as DateTime?
+                    });
+                }
+
+                response.Data = data;
+                response.TotalCount = totalCount;
+                response.Status = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in GetBaggageClaimAsync: {Message}", ex.Message);
+                response.Status = false;
+                response.Message = $"Error: {ex.Message}";
+                response.Data = new List<ResponseBaggageClaim>();
+            }
+
+            return response;
+        }
+
+        public async Task<Response<AddEditResponse>> AddEditBaggageClaimAsync(RequestBaggageClaim request)
+        {
+            var response = new Response<AddEditResponse>();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();      
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "Sp_AddEditBaggageClaim";
+                command.CommandType = CommandType.StoredProcedure;
+
+                void AddParam(string name, object? value)
+                {
+                    var param = command.CreateParameter();
+                    param.ParameterName = name;
+                    param.Value = value ?? DBNull.Value;
+                    command.Parameters.Add(param);
+                }
+
+                AddParam("@Claim_id", request.Claim_id);
+
+                var claimNoParam = new SqlParameter("@Claim_no", SqlDbType.VarChar, 50)
+                {
+                    Direction = ParameterDirection.InputOutput,
+                    Value = request.Claim_no ?? (object)DBNull.Value
+                };
+                command.Parameters.Add(claimNoParam);
+
+                AddParam("@Claim_date", request.Claim_date);
+                AddParam("@Party_id", request.Party_id);
+                AddParam("@Party_name", request.Party_name);
+                AddParam("@Passport_no", request.Passport_no);
+                AddParam("@Name", request.Name);
+                AddParam("@AOC_DR_no", request.AOC_DR_no);
+                AddParam("@Receive_id", request.Receive_id);
+                AddParam("@Baggage_receipt_no", request.Baggage_receipt_no);
+                AddParam("@Baggage_receipt_date", request.Baggage_receipt_date);
+                AddParam("@Remarks", request.Remarks);
+                AddParam("@CreatedBy", request.CreatedBy);
+                AddParam("@UpdatedBy", request.UpdatedBy);
+
+                int insertedId = 0;
+
+                using var reader = await command.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    insertedId = Convert.ToInt32(reader["Claim_id"]);
+                }
+
+                var outputClaimNo = claimNoParam.Value?.ToString();
+
+                response.Data = new AddEditResponse
+                {
+                    Response = request.Claim_id == 0 ? "Inserted successfully" : "Updated successfully"
+                };
+                response.Status = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in AddEditBaggageClaimAsync: {Message}", ex.Message);
+                response.Data = new AddEditResponse
+                {
+                    Response = $"Error: {ex.Message}"
+                };
+                response.Status = false;
+            }
+
+            return response;
+        }
+
+
     }
 }

@@ -240,5 +240,38 @@ namespace SezApi.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+
+        [HttpGet("GetBaggageClaimAsync")]
+        public async Task<IActionResult> GetBaggageClaimAsync(int? claimId, int? page, int? size)
+        {
+
+            var response = await _services.GetBaggageClaimAsync(claimId, page, size);
+
+            if (response.Data == null || !response.Data.Any())
+            {
+                return NotFound(new { message = "No entries found." });
+            }
+
+            return Ok(response);
+        }
+
+
+        [HttpPost("AddEditBaggageClaimAsync")]
+        public async Task<IActionResult> AddEditBaggageClaimAsync(RequestBaggageClaim request)
+        {
+            if (request == null)
+            {
+                return BadRequest("Request data is required.");
+            }
+            try
+            {
+                var result = await _services.AddEditBaggageClaimAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
     }
 }
