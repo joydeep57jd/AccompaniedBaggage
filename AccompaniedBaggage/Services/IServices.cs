@@ -25,5 +25,7 @@ namespace SezApi.Services
 
         Task<Response<List<ResponseBaggageClaim>>> GetBaggageClaimAsync(int? claimId, int? page, int? size);
         Task<Response<AddEditResponse>> AddEditBaggageClaimAsync(RequestBaggageClaim request);
+        Task<Response<AddEditResponse>> AddEditPaymentReceiptAsync(RequestPayementReceipt request);
+        Task<Response<List<ResponseCashReceiptHdr>>> GetPaymentReceiptHdrAsync(int? CashReceiptId, int? page, int? size);
     }
 }
