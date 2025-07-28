@@ -18,5 +18,7 @@
         public DateTime? CreatedDate { get; set; }
         public string? UpdatedBy { get; set; }
         public DateTime? UpdatedDate { get; set; }
+
+        public string? ReceiptNo { get; set; }
     }
 }

@@ -209,10 +209,10 @@ namespace SezApi.Controllers
         }
 
         [HttpGet("GetReceiptDetails")]
-        public async Task<IActionResult> GetReceiptDetails(int? ReceiptId, int? page, int? size)
+        public async Task<IActionResult> GetReceiptDetails(int? ReceiptId, int? page, int? size,bool? forExamStor)
         {
 
-            var response = await _services.GetReceiptDetails(ReceiptId, page, size);
+            var response = await _services.GetReceiptDetails(ReceiptId, page, size, forExamStor);
 
             if (response.Data == null || !response.Data.Any())
             {
@@ -275,7 +275,7 @@ namespace SezApi.Controllers
         }
 
         [HttpPost("AddEditPaymentReceiptAsync")]
-        public async Task<IActionResult> AddEditPaymentReceiptAsync(RequestPayementReceipt request)
+        public async Task<IActionResult> AddEditPaymentReceiptAsync(PaymentReceipt request)
         {
             if (request == null)
             {
@@ -292,11 +292,54 @@ namespace SezApi.Controllers
             }
         }
 
-        [HttpGet("GetPaymentReceiptHdrAsync")]
-        public async Task<IActionResult> GetPaymentReceiptHdrAsync(int? CashReceiptId, int? page, int? size)
+        [HttpGet("GetPaymentReceiptAsync")]
+        public async Task<IActionResult> GetPaymentReceiptAsync(int? receiptId, int? page, int? size)
         {
 
-            var response = await _services.GetPaymentReceiptHdrAsync(CashReceiptId, page, size);
+            var response = await _services.GetPaymentReceiptAsync(receiptId, page, size);
+
+            if (response.Data == null || !response.Data.Any())
+            {
+                return NotFound(new { message = "No entries found." });
+            }
+
+            return Ok(response);
+        }
+
+        [HttpGet("UnclaimedReceiptDto")]
+        public async Task<IActionResult> UnclaimedReceiptDto()
+        {
+            var response = await _services.UnclaimedReceiptDto();
+            if (response.Data == null || !response.Data.Any())
+            {
+                return NotFound(new { message = "No entries found." });
+            }
+            return Ok(response);
+        }
+
+        [HttpPost("AddEditDeliveryAsync")]
+        public async Task<IActionResult> AddEditDeliveryAsync(RequestDelivery request)
+        {
+            if (request == null)
+            {
+                return BadRequest("Request data is required.");
+            }
+
+            try
+            {
+                var result = await _services.AddEditDeliveryAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+        [HttpGet("GetDeliveryAsync")]
+        public async Task<IActionResult> GetDeliveryAsync(int? deliveryId, int? receiptId, int? page, int? size)
+        {
+            var response = await _services.GetDeliveryAsync(deliveryId, receiptId, page, size);
 
             if (response.Data == null || !response.Data.Any())
             {

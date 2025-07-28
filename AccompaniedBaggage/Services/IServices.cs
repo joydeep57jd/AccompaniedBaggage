@@ -20,12 +20,16 @@ namespace SezApi.Services
         Task<Response<List<ResponseExamination>>> GetExaminationAsync(int? examinationId, int? page, int? size);
         Task<Response<AddEditResponse>> AddEditExaminationAsync(RequestExamination request);
 
-        Task<Response<List<ResponseReceiptDetails>>> GetReceiptDetails(int? ReceiptId, int? page, int? size);
+        Task<Response<List<ResponseReceiptDetails>>> GetReceiptDetails(int? ReceiptId, int? page, int? size, bool? forExamStor);
         Task<Response<AddEditResponse>> AddEditReceiptDetailsAsync(RequestReceiptDetails request);
 
         Task<Response<List<ResponseBaggageClaim>>> GetBaggageClaimAsync(int? claimId, int? page, int? size);
         Task<Response<AddEditResponse>> AddEditBaggageClaimAsync(RequestBaggageClaim request);
-        Task<Response<AddEditResponse>> AddEditPaymentReceiptAsync(RequestPayementReceipt request);
-        Task<Response<List<ResponseCashReceiptHdr>>> GetPaymentReceiptHdrAsync(int? CashReceiptId, int? page, int? size);
+        Task<Response<AddEditResponse>> AddEditPaymentReceiptAsync(PaymentReceipt request);
+        Task<Response<List<PaymentReceipt>>> GetPaymentReceiptAsync(int? receiptId, int? page, int? size);
+
+        Task<Response<List<UnclaimedReceiptDto>>> UnclaimedReceiptDto();
+        Task<Response<AddEditResponse>> AddEditDeliveryAsync(RequestDelivery request);
+        Task<Response<List<ResponseDelivery>>> GetDeliveryAsync(int? deliveryId, int? receiptId, int? page, int? size);
     }
 }

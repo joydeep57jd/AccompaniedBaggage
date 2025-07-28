@@ -622,7 +622,8 @@ namespace SezApi.Services
                         CreatedDate = reader["CreatedDate"] as DateTime?,
                         CreatedBy = reader["CreatedBy"] as string,
                         UpdatedDate = reader["UpdatedDate"] as DateTime?,
-                        UpdatedBy = reader["UpdatedBy"] as string
+                        UpdatedBy = reader["UpdatedBy"] as string,
+                        ReceiptNo = reader["ReceiptNo"] as string
                     });
                 }
 
@@ -705,7 +706,7 @@ namespace SezApi.Services
             return response;
         }
 
-        public async Task<Response<List<ResponseReceiptDetails>>> GetReceiptDetails(int? ReceiptId, int? page, int? size)
+        public async Task<Response<List<ResponseReceiptDetails>>> GetReceiptDetails(int? ReceiptId, int? page, int? size, bool? forExamStor)
         {
             var response = new Response<List<ResponseReceiptDetails>>();
 
@@ -721,6 +722,7 @@ namespace SezApi.Services
                 command.Parameters.Add(new SqlParameter("@ReceiptId", ReceiptId ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@page", page ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@size", size ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@forExamStor", forExamStor ?? (object)DBNull.Value));
 
                 using var reader = await command.ExecuteReaderAsync();
 
@@ -880,7 +882,8 @@ namespace SezApi.Services
                         CreatedBy = reader["CreatedBy"] as string,
                         CreatedDate = reader["CreatedDate"] as DateTime?,
                         UpdatedBy = reader["UpdatedBy"] as string,
-                        UpdatedDate = reader["UpdatedDate"] as DateTime?
+                        UpdatedDate = reader["UpdatedDate"] as DateTime?,
+                        ReceiptNo = reader["ReceiptNo"] as string
                     });
                 }
 
@@ -971,7 +974,7 @@ namespace SezApi.Services
             return response;
         }
 
-        public async Task<Response<AddEditResponse>> AddEditPaymentReceiptAsync(RequestPayementReceipt request)
+        public async Task<Response<AddEditResponse>> AddEditPaymentReceiptAsync(PaymentReceipt request)
         {
             var response = new Response<AddEditResponse>();
 
@@ -981,9 +984,10 @@ namespace SezApi.Services
                 await conn.OpenAsync();
 
                 using var command = conn.CreateCommand();
-                command.CommandText = "SP_AddOrUpdateCashReceiptHdr";
+                command.CommandText = "Sp_AddEditPaymentReceipt";
                 command.CommandType = CommandType.StoredProcedure;
 
+                // Helper method to add parameter
                 void AddParam(string name, object? value)
                 {
                     var param = command.CreateParameter();
@@ -991,69 +995,47 @@ namespace SezApi.Services
                     param.Value = value ?? DBNull.Value;
                     command.Parameters.Add(param);
                 }
-                AddParam("@CashReceiptId", request.CashReceiptId);
 
-                var claimNoParam = new SqlParameter("@ReceiptNo", SqlDbType.VarChar, 50)
+                AddParam("@ReceiptId", request.ReceiptId);
+
+                var receiptNoParam = new SqlParameter("@ReceiptNo", SqlDbType.VarChar, 100)
                 {
                     Direction = ParameterDirection.InputOutput,
                     Value = request.ReceiptNo ?? (object)DBNull.Value
                 };
-                command.Parameters.Add(claimNoParam);
+                command.Parameters.Add(receiptNoParam);
 
-                //AddParam("@CashReceiptId", request.CashReceiptId);
-                AddParam("@BranchId", request.BranchId);
-                AddParam("@AutoCashRcptNo", request.AutoCashRcptNo);
-                //AddParam("@ReceiptNo", request.ReceiptNo);
-                AddParam("@ReceiptDate", request.ReceiptDate);
-                AddParam("@InvoiceId", request.InvoiceId);
                 AddParam("@PartyId", request.PartyId);
-                AddParam("@PayByPdaId", request.PayByPdaId);
-                AddParam("@payeeName", request.PayeeName);
-                AddParam("@PdaAdjust", request.PdaAdjust);
-                AddParam("@FolioNo", request.FolioNo);
-                AddParam("@PdaAdjustedAmount", request.PdaAdjustedAmount);
-                AddParam("@PdaOpening", request.PdaOpening);
-                AddParam("@PdaClosing", request.PdaClosing);
-                AddParam("@TotalPaymentReceipt", request.TotalPaymentReceipt);
-                AddParam("@TdsAmount", request.TdsAmount);
-                AddParam("@InvoiceValue", request.InvoiceValue);
-                AddParam("@CompYear", request.CompYear);
+                AddParam("@PartyName", request.PartyName);
+                AddParam("@InvoiceId", request.InvoiceId);
+                AddParam("@InvoiceNo", request.InvoiceNo);
+                AddParam("@Amount", request.Amount);
+                AddParam("@ModeOfPayment", request.ModeOfPayment);
                 AddParam("@Remarks", request.Remarks);
-                AddParam("@PdaAccountDetailsID", request.PdaAccountDetailsID);
-                AddParam("@fromPDA", request.FromPDA);
-                AddParam("@CashReceiptHtml", request.CashReceiptHtml);
-                AddParam("@IsCancelled", request.IsCancelled);
-                AddParam("@CancelledReason", request.CancelledReason);
-                AddParam("@CancelledOn", request.CancelledOn);
-                AddParam("@CancelledBy", request.CancelledBy);
-                AddParam("@InvoiceDebitNote", request.InvoiceDebitNote);
-                AddParam("@OnlineFacAmt", request.OnlineFacAmt);
-                AddParam("@Area", request.Area);
-                AddParam("@TransId", request.TransId);
-                AddParam("@IsSAP", request.IsSAP);
-                AddParam("@IsSAPRev", request.IsSAPRev);
-                AddParam("@SAP_DOC_NUMBER", request.SAP_DOC_NUMBER);
-                AddParam("@CreatedBy", request.CreatedBy);
-                AddParam("@UpdatedBy", request.UpdatedBy);
+                    AddParam("@CreatedBy", request.CreatedBy);
+                    AddParam("@UpdatedBy", request.UpdatedBy);
 
                 int insertedId = 0;
-
                 using var reader = await command.ExecuteReaderAsync();
                 if (await reader.ReadAsync())
                 {
-                    insertedId = Convert.ToInt32(reader["CashReceiptId"]); 
+                    insertedId = Convert.ToInt32(reader["ReceiptId"]);
                 }
-                var outputClaimNo = claimNoParam.Value?.ToString();
+
+                var outputReceiptNo = receiptNoParam.Value?.ToString();
 
                 response.Data = new AddEditResponse
                 {
-                    Response = request.CashReceiptId == 0 ? "Inserted successfully" : "Updated successfully"
+                    //  Id = insertedId,
+                    // ReceiptNo = outputReceiptNo,
+                    Response = request.ReceiptId == 0 ? $"Inserted successfully Id = {insertedId} , ReceiptNo= {outputReceiptNo}" : "Updated successfully"
                 };
                 response.Status = true;
             }
             catch (Exception ex)
             {
                 _logger.LogError("Error in AddEditPaymentReceiptAsync: {Message}", ex.Message);
+
                 response.Data = new AddEditResponse
                 {
                     Response = $"Error: {ex.Message}"
@@ -1064,9 +1046,9 @@ namespace SezApi.Services
             return response;
         }
 
-        public async Task<Response<List<ResponseCashReceiptHdr>>> GetPaymentReceiptHdrAsync(int? CashReceiptId, int? page, int? size)
+        public async Task<Response<List<PaymentReceipt>>> GetPaymentReceiptAsync(int? receiptId, int? page, int? size)
         {
-            var response = new Response<List<ResponseCashReceiptHdr>>();
+            var response = new Response<List<PaymentReceipt>>();
 
             try
             {
@@ -1074,10 +1056,10 @@ namespace SezApi.Services
                 await conn.OpenAsync();
 
                 using var command = conn.CreateCommand();
-                command.CommandText = "GetABCashReceipt";
+                command.CommandText = "GetPaymentReceipt";
                 command.CommandType = CommandType.StoredProcedure;
 
-                command.Parameters.Add(new SqlParameter("@CashReceiptId", CashReceiptId ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@ReceiptId", receiptId ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@page", page ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@size", size ?? (object)DBNull.Value));
 
@@ -1091,51 +1073,26 @@ namespace SezApi.Services
 
                 await reader.NextResultAsync();
 
-                var data = new List<ResponseCashReceiptHdr>();
+                var data = new List<PaymentReceipt>();
                 while (await reader.ReadAsync())
                 {
-                    data.Add(new ResponseCashReceiptHdr
+                    data.Add(new PaymentReceipt
                     {
-                        CashReceiptId = reader.GetInt32(reader.GetOrdinal("CashReceiptId")),
-                        BranchId = reader["BranchId"] as int?,
-                        AutoCashRcptNo = reader["AutoCashRcptNo"] as int?,
+                        ReceiptId = reader.GetInt32(reader.GetOrdinal("ReceiptId")),
                         ReceiptNo = reader["ReceiptNo"] as string,
-                        ReceiptDate = reader["ReceiptDate"] as DateTime?,
-                        InvoiceId = reader["InvoiceId"] as int?,
                         PartyId = reader["PartyId"] as int?,
-                        PayByPdaId = reader["PayByPdaId"] as int?,
-                        PayeeName = reader["payeeName"] as string,
-                        PdaAdjust = reader["PdaAdjust"] as byte?,
-                        FolioNo = reader["FolioNo"] as string,
-                        PdaAdjustedAmount = reader["PdaAdjustedAmount"] as decimal?,
-                        PdaOpening = reader["PdaOpening"] as decimal?,
-                        PdaClosing = reader["PdaClosing"] as decimal?,
-                        TotalPaymentReceipt = reader["TotalPaymentReceipt"] as decimal?,
-                        TdsAmount = reader["TdsAmount"] as decimal?,
-                        InvoiceValue = reader["InvoiceValue"] as decimal?,
-                        CompYear = reader["CompYear"] as string,
+                        PartyName = reader["PartyName"] as string,
+                        InvoiceId = reader["InvoiceId"] as int?,
+                        InvoiceNo = reader["InvoiceNo"] as string,
+                        Amount = reader["Amount"] as decimal? ?? 0,
+                        ModeOfPayment = reader["ModeOfPayment"] as string ?? string.Empty,
                         Remarks = reader["Remarks"] as string,
-                        PdaAccountDetailsID = reader["PdaAccountDetailsID"] as int?,
-                        FromPDA = reader["fromPDA"] as string,
-                        CashReceiptHtml = reader["CashReceiptHtml"] as string,
-                        IsCancelled = reader["IsCancelled"] as int?,
-                        CancelledReason = reader["CancelledReason"] as string,
-                        CancelledOn = reader["CancelledOn"] as DateTime?,
-                        CancelledBy = reader["CancelledBy"] as int?,
-                        InvoiceDebitNote = reader["InvoiceDebitNote"] as string,
-                        OnlineFacAmt = reader["OnlineFacAmt"] as decimal?,
-                        Area = reader["Area"] as string,
-                        TransId = reader["TransId"] as string,
-                        IsSAP = reader["IsSAP"] as int?,
-                        IsSAPRev = reader["IsSAPRev"] as int?,
-                        SAP_DOC_NUMBER = reader["SAP_DOC_NUMBER"] as string,
-                        CreatedBy = reader["CreatedBy"] as int?,
-                        CreatedOn = reader["CreatedOn"] as DateTime?,
-                        UpdatedBy = reader["UpdatedBy"] as int?,
-                        UpdatedOn = reader["UpdatedOn"] as DateTime?
+                        CreatedDate = reader["CreatedDate"] as DateTime?,
+                        CreatedBy = reader["CreatedBy"] as string,
+                        UpdatedDate = reader["UpdatedDate"] as DateTime?,
+                        UpdatedBy = reader["UpdatedBy"] as string
                     });
                 }
-
 
                 response.Data = data;
                 response.TotalCount = totalCount;
@@ -1143,10 +1100,188 @@ namespace SezApi.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError("Error in GetBaggageClaimAsync: {Message}", ex.Message);
+                _logger.LogError("Error in GetPaymentReceiptAsync: {Message}", ex.Message);
                 response.Status = false;
                 response.Message = $"Error: {ex.Message}";
-                response.Data = new List<ResponseCashReceiptHdr>();
+                response.Data = new List<PaymentReceipt>();
+            }
+
+            return response;
+        }
+
+
+        public async Task<Response<List<UnclaimedReceiptDto>>> UnclaimedReceiptDto()
+        {
+            var response = new Response<List<UnclaimedReceiptDto>>();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "Sp_GetUnclaimedReceiptDetails";
+                command.CommandType = CommandType.StoredProcedure;
+
+                using var reader = await command.ExecuteReaderAsync();
+
+                var data = new List<UnclaimedReceiptDto>();
+
+                while (await reader.ReadAsync())
+                {
+                    data.Add(new UnclaimedReceiptDto
+                    {
+                        ReceiptId = reader.GetInt32(reader.GetOrdinal("ReceiptId")),
+                        ReceiptNo = reader["ReceiptNo"] as string,
+                        From = reader["From"] as string,
+                        DrNo = reader["DrNo"] as string,
+                        AocNo = reader["AocNo"] as string,
+                        DateOfLanding = reader["DateOfLanding"] as DateTime?,
+                        PassportNo = reader["PassportNo"] as string,
+                        FlightNo = reader["FlightNo"] as string,
+                        IsSealed = reader["IsSealed"] as bool?,
+                        Remarks = reader["Remarks"] as string,
+                        ReasonForDetention = reader["ReasonForDetention"] as string,
+                        CreatedDate = reader["CreatedDate"] as DateTime?,
+                        UpdatedDate = reader["UpdatedDate"] as DateTime?,
+                        CreatedBy = reader["CreatedBy"] as string,
+                        UpdatedBy = reader["UpdatedBy"] as string,
+                        ReceiptDate = reader["ReceiptDate"] as DateTime?
+                    });
+                }
+
+                response.Data = data;
+                response.TotalCount = data.Count;
+                response.Status = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in GetUnclaimedReceiptDetailsAsync: {Message}", ex.Message);
+                response.Status = false;
+                response.Message = $"Error: {ex.Message}";
+                response.Data = new List<UnclaimedReceiptDto>();
+            }
+
+            return response;
+        }
+
+        public async Task<Response<AddEditResponse>> AddEditDeliveryAsync(RequestDelivery request)
+        {
+            var response = new Response<AddEditResponse>();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "Sp_AddEdit_Delivery";
+                command.CommandType = CommandType.StoredProcedure;
+
+                void AddParam(string name, object? value)
+                {
+                    var param = command.CreateParameter();
+                    param.ParameterName = name;
+                    param.Value = value ?? DBNull.Value;
+                    command.Parameters.Add(param);
+                }
+
+                AddParam("@DeliveryId", request.DeliveryId);
+                AddParam("@ReceiptId", request.ReceiptId);
+                AddParam("@ReceiptNo", request.ReceiptNo);
+                AddParam("@DeliveryDate", request.DeliveryDate);
+                AddParam("@DeliveryTime", request.DeliveryTime);
+                AddParam("@CustomOfficeId", request.CustomOfficeId);
+                AddParam("@Remarks", request.Remarks);
+                AddParam("@CreatedBy", request.CreatedBy);
+                AddParam("@UpdatedBy", request.UpdatedBy);
+
+                int insertedId = 0;
+                using var reader = await command.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    insertedId = Convert.ToInt32(reader["DeliveryId"]);
+                }
+
+                response.Data = new AddEditResponse
+                {
+                    Response = request.DeliveryId == 0
+                        ? $"Inserted successfully. DeliveryId = {insertedId}"
+                        : "Updated successfully"
+                };
+                response.Status = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in AddEditDeliveryAsync: {Message}", ex.Message);
+
+                response.Data = new AddEditResponse
+                {
+                    Response = $"Error: {ex.Message}"
+                };
+                response.Status = false;
+            }
+
+            return response;
+        }
+
+        public async Task<Response<List<ResponseDelivery>>> GetDeliveryAsync(int? deliveryId, int? receiptId, int? page, int? size)
+        {
+            var response = new Response<List<ResponseDelivery>>();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "Sp_Get_Delivery";
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.Parameters.Add(new SqlParameter("@DeliveryId", deliveryId ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@ReceiptId", receiptId ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@page", page ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@size", size ?? (object)DBNull.Value));
+
+                using var reader = await command.ExecuteReaderAsync();
+
+                int totalCount = 0;
+                if (await reader.ReadAsync())
+                {
+                    totalCount = reader.GetInt32(0);
+                }
+
+                await reader.NextResultAsync();
+
+                var data = new List<ResponseDelivery>();
+                while (await reader.ReadAsync())
+                {
+                    data.Add(new ResponseDelivery
+                    {
+                        DeliveryId = reader.GetInt32(reader.GetOrdinal("DeliveryId")),
+                        ReceiptId = reader.GetInt32(reader.GetOrdinal("ReceiptId")),
+                        ReceiptNo = reader["ReceiptNo"] as string,
+                        DeliveryDate = reader["DeliveryDate"] as DateTime?,
+                        DeliveryTime = reader["DeliveryTime"] as TimeSpan?,
+                        CustomOfficeId = reader["CustomOfficeId"] as string,
+                        Remarks = reader["Remarks"] as string,
+                        CreatedDate = reader["CreatedDate"] as DateTime?,
+                        CreatedBy = reader["CreatedBy"] as string,
+                        UpdatedDate = reader["UpdatedDate"] as DateTime?,
+                        UpdatedBy = reader["UpdatedBy"] as string
+                    });
+                }
+
+                response.Data = data;
+                response.TotalCount = totalCount;
+                response.Status = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in GetDeliveryAsync: {Message}", ex.Message);
+                response.Status = false;
+                response.Message = $"Error: {ex.Message}";
+                response.Data = new List<ResponseDelivery>();
             }
 
             return response;

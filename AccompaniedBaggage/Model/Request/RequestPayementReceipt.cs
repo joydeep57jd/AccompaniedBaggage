@@ -49,4 +49,27 @@
         //// Invoice Status (cashreceiptinvstatus)
         //// public List<CashReceiptInvStatus> InvoiceStatusList { get; set; }
     }
+
+    public class PaymentReceipt
+    {
+        public int ReceiptId { get; set; }
+        public string? ReceiptNo { get; set; }
+
+        public int? PartyId { get; set; }
+        public string? PartyName { get; set; }
+
+        public int? InvoiceId { get; set; }
+        public string? InvoiceNo { get; set; }
+
+        public decimal? Amount { get; set; }
+        public string? ModeOfPayment { get; set; } = string.Empty;
+
+        public string? Remarks { get; set; }
+
+        public DateTime? CreatedDate { get; set; }
+        public string? CreatedBy { get; set; } = string.Empty;
+        public DateTime? UpdatedDate { get; set; }
+        public string? UpdatedBy { get; set; }
+    }
+
 }
