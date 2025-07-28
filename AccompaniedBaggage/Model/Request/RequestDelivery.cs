@@ -2,8 +2,8 @@
 {
     public class RequestDelivery
     {
-        public int DeliveryId { get; set; }
-        public int ReceiptId { get; set; }
+        public int? DeliveryId { get; set; }
+        public int? ReceiptId { get; set; }
         public string? ReceiptNo { get; set; }
         public DateTime? DeliveryDate { get; set; }
         public TimeSpan? DeliveryTime { get; set; }
