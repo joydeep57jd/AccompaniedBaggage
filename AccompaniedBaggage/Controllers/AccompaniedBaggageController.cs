@@ -1,6 +1,8 @@
 ﻿using AccompaniedBaggage.Model.Request;
+using AccompaniedBaggage.Model.Response;
 using Microsoft.AspNetCore.Mvc;
 using SezApi.Model.Request;
+using SezApi.Model.Response;
 using SezApi.Services;
 namespace SezApi.Controllers
 {
@@ -48,10 +50,10 @@ namespace SezApi.Controllers
         }
 
         [HttpGet("GetMstSac")]
-        public async Task<IActionResult> GetMstSac(int? sacId, int? page, int? size)
+        public async Task<IActionResult> GetMstSac(int? sacId, int? page, int? size, bool? ForStoragePage, bool? ForHandlingPage)
         {
 
-            var response = await _services.GetMstSac(sacId, page, size);
+            var response = await _services.GetMstSac(sacId, page, size, ForStoragePage, ForHandlingPage);
 
             if (response.Data == null || !response.Data.Any())
             {
@@ -293,10 +295,10 @@ namespace SezApi.Controllers
         }
 
         [HttpGet("GetPaymentReceiptAsync")]
-        public async Task<IActionResult> GetPaymentReceiptAsync(int? receiptId, int? page, int? size)
+        public async Task<IActionResult> GetPaymentReceiptAsync(int? receiptId, int? page, int? size,bool? ForDelhivery)
         {
 
-            var response = await _services.GetPaymentReceiptAsync(receiptId, page, size);
+            var response = await _services.GetPaymentReceiptAsync(receiptId, page, size, ForDelhivery);
 
             if (response.Data == null || !response.Data.Any())
             {
@@ -317,25 +319,6 @@ namespace SezApi.Controllers
             return Ok(response);
         }
 
-        [HttpPost("AddEditDeliveryAsync")]
-        public async Task<IActionResult> AddEditDeliveryAsync(RequestDelivery request)
-        {
-            if (request == null)
-            {
-                return BadRequest("Request data is required.");
-            }
-
-            try
-            {
-                var result = await _services.AddEditDeliveryAsync(request);
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
-        }
-
         [HttpGet("GetDeliveryAsync")]
         public async Task<IActionResult> GetDeliveryAsync(int? deliveryId, int? receiptId, int? page, int? size)
         {
@@ -348,5 +331,93 @@ namespace SezApi.Controllers
 
             return Ok(response);
         }
+
+        [HttpPost("AddEditDelivery")]
+        public async Task<IActionResult> AddEditDelivery(RequestDelivery request)
+        {
+            if (request == null)
+            {
+                return BadRequest("Request data is required.");
+            }
+            try
+            {
+                var result = await _services.AddEditDeliveryAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+        [HttpGet("GetHandlingChargesCalc")]
+        public async Task<IActionResult> GetHandlingChargesCalc(string customType, string receiptNo, int partyId)
+        {
+            try
+            {
+                var result = await _services.GetHandlingChargesCalcAsync(customType, receiptNo, partyId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+        [HttpGet("GetInvoiceChargesAsync")]
+        public async Task<IActionResult> GetInvoiceChargesAsync(int? id, int? inoviceId, int? page, int? size)
+        {
+            try
+            {
+                var result = await _services.GetInvoiceChargesAsync(id, inoviceId, page, size);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+        [HttpGet("GetBaggageClaimReportAsync")]
+        public async Task<IActionResult> GetBaggageClaimReportAsync(DateTime? fromDate, DateTime? toDate)
+        {
+            try
+            {
+                var result = await _services.GetBaggageClaimReportAsync(fromDate, toDate);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+        [HttpGet("GetMstCompanyAsync")]
+        public async Task<IActionResult> GetMstCompanyAsync(int? companyId)
+        {
+            try
+            {
+                var result = await _services.GetMstCompanyAsync(companyId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(200, $"Internal server error: {ex.Message}");
+            }
+        }
+
+        [HttpGet("GetStorageChargesCalcAsync")]
+        public async Task<IActionResult> GetStorageChargesCalcAsync(string receiptNo, int partyId, DateTime claimDate)
+        {   try
+            {
+                var result = await _services.GetStorageChargesCalcAsync(receiptNo, partyId, claimDate);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(200, $"Internal server error: {ex.Message}");
+            }
+        }
+
     }
 }

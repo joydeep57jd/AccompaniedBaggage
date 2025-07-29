@@ -104,7 +104,7 @@ namespace SezApi.Services
             return response;
         }
 
-        public async Task<Response<List<ResponseMstSac>>> GetMstSac(int? sacId, int? page, int? size)
+        public async Task<Response<List<ResponseMstSac>>> GetMstSac(int? sacId, int? page, int? size, bool? ForStoragePage, bool? ForHandlingPage)
         {
             var response = new Response<List<ResponseMstSac>>();
 
@@ -120,7 +120,8 @@ namespace SezApi.Services
                 command.Parameters.Add(new SqlParameter("@SacId", sacId ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@page", page ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@size", size ?? (object)DBNull.Value));
-
+                command.Parameters.Add(new SqlParameter("@ForStoragePage", ForStoragePage ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@ForHandlingPage", ForHandlingPage ?? (object)DBNull.Value));
                 using var reader = await command.ExecuteReaderAsync();
 
                 int totalCount = 0;
@@ -316,7 +317,9 @@ namespace SezApi.Services
                         CreatedBy = reader["CreatedBy"] as int?,
                         CreatedDate = reader["CreatedDate"] as DateTime?,
                         UpdatedBy = reader["UpdatedBy"] as int?,
-                        UpdatedDate = reader["UpdatedDate"] as DateTime?
+                        UpdatedDate = reader["UpdatedDate"] as DateTime?,
+                        SacCode = reader["SacCode"] as string  ,
+                        StorageType = reader["StorageType"] as string
                     });
                 }
 
@@ -355,6 +358,8 @@ namespace SezApi.Services
                 command.Parameters.Add(new SqlParameter("@ToDay", request.ToDay));
                 command.Parameters.Add(new SqlParameter("@CreatedBy", request.CreatedBy ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@UpdatedBy", request.UpdatedBy ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@SacCode", request.SacCode ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@StorageType", request.StorageType ?? (object)DBNull.Value));
 
                 using var reader = await command.ExecuteReaderAsync();
 
@@ -417,7 +422,8 @@ namespace SezApi.Services
                         CreatedBy = reader["CreatedBy"] as int?,
                         CreatedDate = reader["CreatedDate"] as DateTime?,
                         UpdatedBy = reader["UpdatedBy"] as int?,
-                        UpdatedDate = reader["UpdatedDate"] as DateTime?
+                        UpdatedDate = reader["UpdatedDate"] as DateTime?,
+                        SacCode = reader["SacCode"] as string
                     });
                 }
 
@@ -454,7 +460,7 @@ namespace SezApi.Services
                 command.Parameters.Add(new SqlParameter("@Amount", request.Amount ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@CreatedBy", request.CreatedBy ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@UpdatedBy", request.UpdatedBy ?? (object)DBNull.Value));
-
+                command.Parameters.Add(new SqlParameter("@SacCode", request.SacCode ?? (object)DBNull.Value));
                 using var reader = await command.ExecuteReaderAsync();
 
                 if (await reader.ReadAsync())
@@ -908,7 +914,7 @@ namespace SezApi.Services
 
             try
             {
-                var conn = _db.Database.GetDbConnection();      
+                var conn = _db.Database.GetDbConnection();
                 await conn.OpenAsync();
 
                 using var command = conn.CreateCommand();
@@ -947,10 +953,26 @@ namespace SezApi.Services
 
                 int insertedId = 0;
 
-                using var reader = await command.ExecuteReaderAsync();
-                if (await reader.ReadAsync())
+                // Execute reader
+                using (var reader = await command.ExecuteReaderAsync())
                 {
-                    insertedId = Convert.ToInt32(reader["Claim_id"]);
+                    if (await reader.ReadAsync())
+                    {
+                        insertedId = Convert.ToInt32(reader["Claim_id"]);
+                    }
+                } // Reader automatically closed here
+
+                // Now safe to reuse connection for second command
+                if (insertedId != 0 && !string.IsNullOrEmpty(request.jsonData))
+                {
+                    using var chargesCmd = conn.CreateCommand();
+                    chargesCmd.CommandText = "SP_AddInvoiceChargesJson";
+                    chargesCmd.CommandType = CommandType.StoredProcedure;
+
+                    chargesCmd.Parameters.Add(new SqlParameter("@InvoiceId", insertedId));
+                    chargesCmd.Parameters.Add(new SqlParameter("@jsonData", request.jsonData));
+
+                    await chargesCmd.ExecuteNonQueryAsync();
                 }
 
                 var outputClaimNo = claimNoParam.Value?.ToString();
@@ -1046,7 +1068,7 @@ namespace SezApi.Services
             return response;
         }
 
-        public async Task<Response<List<PaymentReceipt>>> GetPaymentReceiptAsync(int? receiptId, int? page, int? size)
+        public async Task<Response<List<PaymentReceipt>>> GetPaymentReceiptAsync(int? receiptId, int? page, int? size, bool? ForDelhivery)
         {
             var response = new Response<List<PaymentReceipt>>();
 
@@ -1062,6 +1084,7 @@ namespace SezApi.Services
                 command.Parameters.Add(new SqlParameter("@ReceiptId", receiptId ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@page", page ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@size", size ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@ForDelhivery", ForDelhivery ?? (object)DBNull.Value));
 
                 using var reader = await command.ExecuteReaderAsync();
 
@@ -1285,6 +1308,304 @@ namespace SezApi.Services
             }
 
             return response;
+        }
+
+
+        public async Task<ResponseHandlingCharge?> GetHandlingChargesCalcAsync(string customType, string receiptNo, int partyId)
+        {
+            using var conn = _db.Database.GetDbConnection();
+            await conn.OpenAsync();
+
+            using var command = conn.CreateCommand();
+            command.CommandText = "HandlingChargesCalc";
+            command.CommandType = CommandType.StoredProcedure;
+
+            command.Parameters.Add(new SqlParameter("@CustomType", customType));
+            command.Parameters.Add(new SqlParameter("@ReceiptNo", receiptNo));
+            command.Parameters.Add(new SqlParameter("@PartyId", partyId));
+
+            using var reader = await command.ExecuteReaderAsync();
+
+            if (await reader.ReadAsync())
+            {
+                return new ResponseHandlingCharge
+                {
+                    ValueType = reader["ValueType"]?.ToString(),
+                    ChargeName = reader["ChargeName"]?.ToString(),
+                    TotalValue = reader.GetDecimal(reader.GetOrdinal("TotalValue")),
+                    SacCode = reader["SacCode"]?.ToString(),
+                    CGST = reader.GetDecimal(reader.GetOrdinal("CGST")),
+                    SGST = reader.GetDecimal(reader.GetOrdinal("SGST")),
+                    IGST = reader.GetDecimal(reader.GetOrdinal("IGST")),
+                    CGSTAmount = reader.GetDecimal(reader.GetOrdinal("CGSTAmount")),
+                    SGSTAmount = reader.GetDecimal(reader.GetOrdinal("SGSTAmount")),
+                    IGSTAmount = reader.GetDecimal(reader.GetOrdinal("IGSTAmount")),
+                    TotalAmt = reader.GetDecimal(reader.GetOrdinal("TotalAmt"))
+                };
+            }
+
+            return null;
+        }
+
+        public async Task<InvoiceChargeListResponse> GetInvoiceChargesAsync(int? id, int? inoviceId, int? page, int? size)
+        {
+            var response = new InvoiceChargeListResponse();
+
+            using var conn = _db.Database.GetDbConnection();
+            await conn.OpenAsync();
+
+            using var command = conn.CreateCommand();
+            command.CommandText = "GetInvoiceCharges";
+            command.CommandType = CommandType.StoredProcedure;
+
+            command.Parameters.Add(new SqlParameter("@Id", id ?? (object)DBNull.Value));
+            command.Parameters.Add(new SqlParameter("@InoviceId", inoviceId ?? (object)DBNull.Value));
+            command.Parameters.Add(new SqlParameter("@page", page ?? (object)DBNull.Value));
+            command.Parameters.Add(new SqlParameter("@size", size ?? (object)DBNull.Value));
+
+            using var reader = await command.ExecuteReaderAsync();
+
+            // First Result: TotalRecords
+            if (await reader.ReadAsync())
+            {
+                response.TotalRecords = Convert.ToInt32(reader["TotalRecords"]);
+            }
+
+            // Move to next result set
+            if (await reader.NextResultAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    var item = new ResponseInvoiceCharge
+                    {
+                        Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                        ChargesTypeId = reader.GetInt32(reader.GetOrdinal("ChargesTypeId")),
+                        InoviceId = reader.GetInt32(reader.GetOrdinal("InoviceId")),
+                        OperationId = reader["OperationId"] as int?,
+                        Clause = reader["Clause"]?.ToString(),
+                        ChargeType = reader["ChargeType"]?.ToString(),
+                        ChargeName = reader["ChargeName"]?.ToString(),
+                        SACCode = reader["SACCode"]?.ToString(),
+                        Quantity = reader["Quantity"] as int?,
+                        Rate = reader["Rate"] as decimal?,
+                        Amount = reader["Amount"] as decimal?,
+                        Discount = reader["Discount"] as decimal?,
+                        Taxable = reader["Taxable"] as decimal?,
+                        IGSTPer = reader["IGSTPer"] as decimal?,
+                        IGSTAmt = reader["IGSTAmt"] as decimal?,
+                        CGSTPer = reader["CGSTPer"] as decimal?,
+                        CGSTAmt = reader["CGSTAmt"] as decimal?,
+                        SGSTPer = reader["SGSTPer"] as decimal?,
+                        SGSTAmt = reader["SGSTAmt"] as decimal?,
+                        Total = reader["Total"] as decimal?
+                    };
+
+                    response.Data.Add(item);
+                }
+            }
+
+            return response;
+        }
+
+        public async Task<List<BaggageClaimReportResponse>> GetBaggageClaimReportAsync(DateTime? fromDate, DateTime? toDate)
+        {
+            var result = new List<BaggageClaimReportResponse>();
+
+            try
+            {
+                using var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "RegisterOfBaggageClaimReport";
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.Parameters.Add(new SqlParameter("@FromDate", fromDate ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@ToDate", toDate ?? (object)DBNull.Value));
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var row = new BaggageClaimReportResponse
+                    {
+                        CompanyName = reader["CompanyName"]?.ToString() ?? "",
+                        GSTNO = reader["GSTNO"]?.ToString() ?? "",
+                        StateName = reader["StateName"]?.ToString() ?? "",
+                        CustomerName = reader["CustomerName"]?.ToString() ?? "",
+
+                        PeriodOfInvoice = reader["PeriodOfInvoice"]?.ToString() ?? "",
+                        NatureOfInvoice = reader["NatureOfInvoice"]?.ToString() ?? "",
+                        HSNCode = reader["HSNCode"]?.ToString() ?? "",
+
+                        InvNo = reader["InvNo"]?.ToString() ?? "",
+                        InvDate = reader.GetDateTime(reader.GetOrdinal("InvDate")),
+
+                        TaxableAmt = reader.GetDecimal(reader.GetOrdinal("TaxableAmt")),
+                        CGSTRate = reader.GetDecimal(reader.GetOrdinal("CGSTRate")),
+                        CGSTAmt = reader.GetDecimal(reader.GetOrdinal("CGSTAmt")),
+                        SGSTRate = reader.GetDecimal(reader.GetOrdinal("SGSTRate")),
+                        SGSTAmt = reader.GetDecimal(reader.GetOrdinal("SGSTAmt")),
+                        IGSTRate = reader.GetDecimal(reader.GetOrdinal("IGSTRate")),
+                        IGSTAmt = reader.GetDecimal(reader.GetOrdinal("IGSTAmt")),
+                        Total = reader.GetDecimal(reader.GetOrdinal("Total")),
+
+                        PaymentMode = reader["PaymentMode"]?.ToString() ?? "",
+                        Remarks = reader["Remarks"]?.ToString() ?? "",
+
+                        CreditNoteNo = reader["CreditNoteNo"]?.ToString() ?? "",
+                        CreditNoteDate = reader.GetDateTime(reader.GetOrdinal("CreditNoteDate")),
+
+                        RatePerBag = reader.GetDecimal(reader.GetOrdinal("RatePerBag"))
+                    };
+
+                    result.Add(row);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Failed to load baggage claim report.", ex);
+            }
+
+            return result;
+        }
+
+        public async Task<List<ResponseMstCompany>> GetMstCompanyAsync(int? companyId)
+        {
+            var companies = new List<ResponseMstCompany>();
+
+            using var conn = _db.Database.GetDbConnection();
+            await conn.OpenAsync();
+
+            using var command = conn.CreateCommand();
+            command.CommandText = "GetMstCompanyById";
+            command.CommandType = CommandType.StoredProcedure;
+            command.Parameters.Add(new SqlParameter("@CompanyId", (object?)companyId ?? DBNull.Value));
+
+            using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var company = new ResponseMstCompany
+                {
+                    CompanyId = reader["CompanyId"] as int?,
+                    ROAddress = reader["ROAddress"] as string,
+                    CompanyName = reader["CompanyName"] as string,
+                    CompanyShortName = reader["CompanyShortName"] as string,
+                    CompanyAddress = reader["CompanyAddress"] as string,
+                    PhoneNo = reader["PhoneNo"] as string,
+                    FaxNumber = reader["FaxNumber"] as string,
+                    EmailAddress = reader["EmailAddress"] as string,
+                    StateId = reader["StateId"] as int?,
+                    StateCode = reader["StateCode"] as string,
+                    CityId = reader["CityId"] as int?,
+                    CFSFormat = reader["CFSFormat"] as string,
+                    GstIn = reader["GstIn"] as string,
+                    Pan = reader["Pan"] as string,
+                    BranchId = reader["BranchId"] as int?,
+                    InvoiceStateCode = reader["InvoiceStateCode"] as string,
+                    InvoiceCfsCode = reader["InvoiceCfsCode"] as string,
+                    BillOfSupplyCfsCode = reader["BillOfSupplyCfsCode"] as string,
+                    CRNoteCfsCode = reader["CRNoteCfsCode"] as string,
+                    DRNoteCfsCode = reader["DRNoteCfsCode"] as string,
+                    AddMoneyToPdCfsCode = reader["AddMoneyToPdCfsCode"] as string,
+                    AuctionEffectiveDays = reader["AuctionEffectiveDays"] as int?,
+                    DueDaysAftrAucNtc = reader["DueDaysAftrAucNtc"] as int?,
+                    AucNtcDaysAftrLanding = reader["AucNtcDaysAftrLanding"] as int?,
+                    FreeDaysAfterAuction = reader["FreeDaysAfterAuction"] as int?,
+                    AuctionNoticeNoPrefix = reader["AuctionNoticeNoPrefix"] as string,
+                    AuctionNoticeCC = reader["AuctionNoticeCC"] as string,
+                    AuctionNoticeDocPrefix = reader["AuctionNoticeDocPrefix"] as string,
+                    CreatedBy = reader["CreatedBy"] as int?,
+                    CreatedOn = reader["CreatedOn"] as DateTime?,
+                    BidNumberPrefix = reader["BidNumberPrefix"] as string,
+                    LocationUrl = reader["LocationUrl"] as string,
+                    ContactAddress = reader["ContactAddress"] as string,
+                    ContactPhone = reader["ContactPhone"] as string,
+                    BranchType = reader["BranchType"] as string,
+                    BranchName = reader["BranchName"] as string,
+                    Version = reader["Version"] as decimal?,
+                    Effectlogofile = reader["Effectlogofile"] as string,
+                    ClientID = reader["ClientID"] as string,
+                    ClientSecret = reader["ClientSecret"] as string,
+                    UserName = reader["UserName"] as string,
+                    Password = reader["Password"] as string,
+                    PinCode = reader["PinCode"] as string,
+                    PortofReporting = reader["PortofReporting"] as string,
+                    ReportingLocationCode = reader["ReportingLocationCode"] as string,
+                    ReportingLocationName = reader["ReportingLocationName"] as string,
+                    AuthorizedPersonPAN = reader["AuthorizedPersonPAN"] as string,
+                    SCMTREnvironment = reader["SCMTREnvironment"] as string,
+                    SenderId = reader["SenderId"] as string,
+                    ReceiverId = reader["ReceiverId"] as string,
+                    VersionNo = reader["VersionNo"] as string,
+                    SCMTRUserId = reader["SCMTRUserId"] as string,
+                    Location = reader["Location"] as string,
+                    DSCPASSWORD = reader["DSCPASSWORD"] as string,
+                    ver = reader["ver"] as string,
+                    mode = reader["mode"] as int?,
+                    orgId = reader["orgId"] as int?,
+                    tid = reader["tid"] as string,
+                    pa = reader["pa"] as string,
+                    mc = reader["mc"] as int?,
+                    mid = reader["mid"] as string,
+                    msid = reader["msid"] as string,
+                    mtid = reader["mtid"] as string,
+                    qrMedium = reader["qrMedium"] as string,
+                    QRexpireDays = reader["QRexpireDays"] as int?,
+                    tier = reader["tier"] as string,
+                    Pn = reader["Pn"] as string,
+                    ARVersion = reader["ARVersion"] as string,
+                    ccavenuemid = reader["ccavenuemid"] as string,
+                    ccavenueCancelURL = reader["ccavenueCancelURL"] as string,
+                    ccavenueRedirectURL = reader["ccavenueRedirectURL"] as string,
+                    mKey = reader["mKey"] as string,
+                    BqrAcoountId = reader["BqrAcoountId"] as string,
+                    InvoiceSLACode = reader["InvoiceSLACode"] as string,
+                    ProfitCenter = reader["ProfitCenter"] as string,
+                    WarehouseCode = reader["WarehouseCode"] as string,
+                    BusinessPlace = reader["BusinessPlace"] as string,
+                    SectionCode = reader["SectionCode"] as string,
+                    CostCenter = reader["CostCenter"] as string
+                };
+
+                companies.Add(company);
+            }
+
+            return companies;
+        }
+
+        public async Task<ResponseStorageChargesCalc?> GetStorageChargesCalcAsync(string receiptNo, int partyId, DateTime claimDate)
+        {
+            using var conn = _db.Database.GetDbConnection();
+            await conn.OpenAsync();
+
+            using var command = conn.CreateCommand();
+            command.CommandText = "StorageChargesCalc";
+            command.CommandType = CommandType.StoredProcedure;
+
+            command.Parameters.Add(new SqlParameter("@ReceiptNo", receiptNo));
+            command.Parameters.Add(new SqlParameter("@PartyId", partyId));
+            command.Parameters.Add(new SqlParameter("@ClaimDate", claimDate));
+
+            using var reader = await command.ExecuteReaderAsync();
+
+            if (await reader.ReadAsync())
+            {
+                return new ResponseStorageChargesCalc
+                {
+                    ChargeName = reader["ChargeName"].ToString(),
+                    TotalValue = reader.GetDecimal(reader.GetOrdinal("TotalValue")),
+                    SacCode = reader["SacCode"].ToString(),
+                    CGST = reader.GetDecimal(reader.GetOrdinal("CGST")),
+                    SGST = reader.GetDecimal(reader.GetOrdinal("SGST")),
+                    IGST = reader.GetDecimal(reader.GetOrdinal("IGST")),
+                    CGSTAmount = reader.GetDecimal(reader.GetOrdinal("CGSTAmount")),
+                    SGSTAmount = reader.GetDecimal(reader.GetOrdinal("SGSTAmount")),
+                    IGSTAmount = reader.GetDecimal(reader.GetOrdinal("IGSTAmount")),
+                    TotalAmt = reader.GetDecimal(reader.GetOrdinal("TotalAmt"))
+                };
+            }
+
+            return null;
         }
 
     }
