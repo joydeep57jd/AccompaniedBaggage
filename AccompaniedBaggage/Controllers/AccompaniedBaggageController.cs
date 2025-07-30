@@ -211,10 +211,10 @@ namespace SezApi.Controllers
         }
 
         [HttpGet("GetReceiptDetails")]
-        public async Task<IActionResult> GetReceiptDetails(int? ReceiptId, int? page, int? size,bool? forExamStor)
+        public async Task<IActionResult> GetReceiptDetails(int? ReceiptId, int? page, int? size,bool? forExamStor,DateTime? FromreceiptDate,DateTime? ToreceiptDate)
         {
 
-            var response = await _services.GetReceiptDetails(ReceiptId, page, size, forExamStor);
+            var response = await _services.GetReceiptDetails(ReceiptId, page, size, forExamStor, FromreceiptDate, ToreceiptDate);
 
             if (response.Data == null || !response.Data.Any())
             {
@@ -244,10 +244,10 @@ namespace SezApi.Controllers
         }
 
         [HttpGet("GetBaggageClaimAsync")]
-        public async Task<IActionResult> GetBaggageClaimAsync(int? claimId, int? page, int? size)
+        public async Task<IActionResult> GetBaggageClaimAsync(int? claimId, int? page, int? size, int? Party_id, bool? ForPaymentReceipt)
         {
 
-            var response = await _services.GetBaggageClaimAsync(claimId, page, size);
+            var response = await _services.GetBaggageClaimAsync(claimId, page, size, Party_id, ForPaymentReceipt);
 
             if (response.Data == null || !response.Data.Any())
             {
@@ -416,6 +416,38 @@ namespace SezApi.Controllers
             catch (Exception ex)
             {
                 return StatusCode(200, $"Internal server error: {ex.Message}");
+            }
+        }
+
+        [HttpGet("GetDeliveryReportAsync")]
+        public async Task<IActionResult> GetDeliveryReportAsync(DateTime? fromDate, DateTime? toDate)
+        {
+            try
+            {
+                var result = await _services.GetBaggageDeliveryReportAsync(fromDate, toDate);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
+
+        [HttpGet("GetStockRegisterReportAsync")]
+        public async Task<IActionResult> GetStockRegisterReportAsync(
+    DateTime? fromReceiptDate,
+    DateTime? toReceiptDate,
+    DateTime? fromExaminationDate,
+    DateTime? toExaminationDate)
+        {
+            try
+            {
+                var result = await _services.GetStockRegisterReportAsync(fromReceiptDate, toReceiptDate, fromExaminationDate, toExaminationDate);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 

@@ -318,7 +318,7 @@ namespace SezApi.Services
                         CreatedDate = reader["CreatedDate"] as DateTime?,
                         UpdatedBy = reader["UpdatedBy"] as int?,
                         UpdatedDate = reader["UpdatedDate"] as DateTime?,
-                        SacCode = reader["SacCode"] as string  ,
+                        SacCode = reader["SacCode"] as string,
                         StorageType = reader["StorageType"] as string
                     });
                 }
@@ -712,7 +712,7 @@ namespace SezApi.Services
             return response;
         }
 
-        public async Task<Response<List<ResponseReceiptDetails>>> GetReceiptDetails(int? ReceiptId, int? page, int? size, bool? forExamStor)
+        public async Task<Response<List<ResponseReceiptDetails>>> GetReceiptDetails(int? ReceiptId, int? page, int? size, bool? forExamStor, DateTime? FromreceiptDate, DateTime? ToreceiptDate)
         {
             var response = new Response<List<ResponseReceiptDetails>>();
 
@@ -729,6 +729,8 @@ namespace SezApi.Services
                 command.Parameters.Add(new SqlParameter("@page", page ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@size", size ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@forExamStor", forExamStor ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@FromreceiptDate", FromreceiptDate ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@ToreceiptDate", ToreceiptDate ?? (object)DBNull.Value));
 
                 using var reader = await command.ExecuteReaderAsync();
 
@@ -841,7 +843,7 @@ namespace SezApi.Services
             return response;
         }
 
-        public async Task<Response<List<ResponseBaggageClaim>>> GetBaggageClaimAsync(int? claimId, int? page, int? size)
+        public async Task<Response<List<ResponseBaggageClaim>>> GetBaggageClaimAsync(int? claimId, int? page, int? size, int? Party_id, bool? ForPaymentReceipt)
         {
             var response = new Response<List<ResponseBaggageClaim>>();
 
@@ -857,7 +859,8 @@ namespace SezApi.Services
                 command.Parameters.Add(new SqlParameter("@Claim_id", claimId ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@page", page ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@size", size ?? (object)DBNull.Value));
-
+                command.Parameters.Add(new SqlParameter("@Party_id", Party_id ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@ForPaymentReceipt", ForPaymentReceipt ?? (object)DBNull.Value));
                 using var reader = await command.ExecuteReaderAsync();
 
                 int totalCount = 0;
@@ -1034,8 +1037,8 @@ namespace SezApi.Services
                 AddParam("@Amount", request.Amount);
                 AddParam("@ModeOfPayment", request.ModeOfPayment);
                 AddParam("@Remarks", request.Remarks);
-                    AddParam("@CreatedBy", request.CreatedBy);
-                    AddParam("@UpdatedBy", request.UpdatedBy);
+                AddParam("@CreatedBy", request.CreatedBy);
+                AddParam("@UpdatedBy", request.UpdatedBy);
 
                 int insertedId = 0;
                 using var reader = await command.ExecuteReaderAsync();
@@ -1606,6 +1609,123 @@ namespace SezApi.Services
             }
 
             return null;
+        }
+
+
+        public async Task<Response<List<ResponseDeliveryReport>>> GetBaggageDeliveryReportAsync(DateTime? fromDate, DateTime? toDate)
+        {
+            var response = new Response<List<ResponseDeliveryReport>>
+            {
+                Data = new List<ResponseDeliveryReport>(),
+                Status = true,
+                Message = "Success"
+            };
+
+            try
+            {
+                using var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "RegisterOfBaggageDeliveryReport";
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.Parameters.Add(new SqlParameter("@FromDate", SqlDbType.DateTime) { Value = (object?)fromDate ?? DBNull.Value });
+                command.Parameters.Add(new SqlParameter("@ToDate", SqlDbType.DateTime) { Value = (object?)toDate ?? DBNull.Value });
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    var row = new ResponseDeliveryReport
+                    {
+                        DeliveryId = reader["DeliveryId"] as int?,
+                        ReceiptId = reader["ReceiptId"] as int?,
+                        ReceiptNo = reader["ReceiptNo"] as string,
+                        DeliveryDate = reader["DeliveryDate"] as DateTime?,
+                        CustomOfficeId = reader["CustomOfficeId"] as string,
+                        Remarks = reader["Remarks"] as string,
+                        DeliveryTime = reader["DeliveryTime"] is TimeSpan ts ? ts.ToString(@"hh\:mm\:ss") : reader["DeliveryTime"]?.ToString(),
+                        BaggageReceiptNo = reader["BaggageReceiptNo"] as string,
+                        BaggageReceiptDate = reader["BaggageReceiptDate"] as DateTime?,
+                        BaggageFrom = reader["BaggageFrom"] as string
+                    };
+
+                    response.Data.Add(row);
+                }
+
+                response.TotalCount = response.Data.Count;
+            }
+            catch (Exception ex)
+            {
+                response.Status = false;
+                response.Message = $"Error: {ex.Message}";
+                response.Data = new List<ResponseDeliveryReport>();
+                response.TotalCount = 0;
+            }
+
+            return response;
+        }
+
+        public async Task<Response<List<StockRegisterReportRow>>> GetStockRegisterReportAsync(
+    DateTime? fromReceiptDate,
+    DateTime? toReceiptDate,
+    DateTime? fromExaminationDate,
+    DateTime? toExaminationDate)
+        {
+            var response = new Response<List<StockRegisterReportRow>>();
+            var result = new List<StockRegisterReportRow>();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "StockRegisterReport";
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.Parameters.Add(new SqlParameter("@FromReceiptDate", SqlDbType.DateTime) { Value = (object?)fromReceiptDate ?? DBNull.Value });
+                command.Parameters.Add(new SqlParameter("@ToReceiptDate", SqlDbType.DateTime) { Value = (object?)toReceiptDate ?? DBNull.Value });
+                command.Parameters.Add(new SqlParameter("@FromExaminationDate", SqlDbType.DateTime) { Value = (object?)fromExaminationDate ?? DBNull.Value });
+                command.Parameters.Add(new SqlParameter("@ToExaminationDate", SqlDbType.DateTime) { Value = (object?)toExaminationDate ?? DBNull.Value });
+
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    result.Add(new StockRegisterReportRow
+                    {
+                        ReceiptNo = reader["ReceiptNo"]?.ToString(),
+                        ReceiptDate = reader["ReceiptDate"] as DateTime?,
+                        From = reader["FROM"]?.ToString(),
+                        FlightNo = reader["FlightNo"]?.ToString(),
+                        DateOfLanding = reader["DateOfLanding"] as DateTime?,
+                        AocNo = reader["AocNo"]?.ToString(),
+                        PassportNo = reader["PassportNo"]?.ToString(),
+                        Colour = reader["Colour"]?.ToString(),
+                        ColourCode = reader["Colour_code"]?.ToString(),
+                        WeightKg = reader["Weight_kg"] as decimal?,
+                        Size = reader["Size"]?.ToString(),
+                        StoredLocation = reader["Stored_location"]?.ToString(),
+                        Length = reader["Length"] as decimal?,
+                        Height = reader["Height"] as decimal?,
+                        ExaminationDate = reader["Examination_date"] as DateTime?
+                    });
+                }
+
+                response.Status = true;
+                response.Data = result;
+                response.Message = "Data fetched successfully";
+                response.TotalCount = result.Count;
+            }
+            catch (Exception ex)
+            {
+                response.Status = false;
+                response.Message = ex.Message;
+                response.Data = null;
+                response.TotalCount = 0;
+            }
+
+            return response;
         }
 
     }
