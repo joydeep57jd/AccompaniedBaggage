@@ -32,7 +32,7 @@ namespace SezApi.Services
         Task<Response<AddEditResponse>> AddEditDeliveryAsync(RequestDelivery request);
         Task<Response<List<ResponseDelivery>>> GetDeliveryAsync(int? deliveryId, int? receiptId, int? page, int? size);
 
-        Task<ResponseHandlingCharge?> GetHandlingChargesCalcAsync(string customType, string receiptNo, int partyId);
+        Task<ResponseHandlingCharge?> GetHandlingChargesCalcAsync(string customType, string receiptNo, int partyId,string StorageType);
 
         Task<InvoiceChargeListResponse> GetInvoiceChargesAsync(int? id, int? inoviceId, int? page, int? size);
         Task<List<BaggageClaimReportResponse>> GetBaggageClaimReportAsync(DateTime? fromDate, DateTime? toDate);

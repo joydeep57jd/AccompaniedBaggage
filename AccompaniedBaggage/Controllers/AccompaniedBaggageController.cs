@@ -351,11 +351,11 @@ namespace SezApi.Controllers
         }
 
         [HttpGet("GetHandlingChargesCalc")]
-        public async Task<IActionResult> GetHandlingChargesCalc(string customType, string receiptNo, int partyId)
+        public async Task<IActionResult> GetHandlingChargesCalc(string customType, string receiptNo, int partyId,string StorageType)
         {
             try
             {
-                var result = await _services.GetHandlingChargesCalcAsync(customType, receiptNo, partyId);
+                var result = await _services.GetHandlingChargesCalcAsync(customType, receiptNo, partyId, StorageType);
                 return Ok(result);
             }
             catch (Exception ex)

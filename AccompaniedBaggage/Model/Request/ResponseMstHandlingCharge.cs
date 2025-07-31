@@ -11,5 +11,7 @@
         public DateTime? UpdatedDate { get; set; }
 
         public string? SacCode { get; set; }
+
+        public string? StorageType { get; set; }
     }
 }

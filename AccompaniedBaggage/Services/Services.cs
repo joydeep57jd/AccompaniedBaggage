@@ -423,7 +423,8 @@ namespace SezApi.Services
                         CreatedDate = reader["CreatedDate"] as DateTime?,
                         UpdatedBy = reader["UpdatedBy"] as int?,
                         UpdatedDate = reader["UpdatedDate"] as DateTime?,
-                        SacCode = reader["SacCode"] as string
+                        SacCode = reader["SacCode"] as string,
+                        StorageType = reader["StorageType"] as string   
                     });
                 }
 
@@ -461,6 +462,7 @@ namespace SezApi.Services
                 command.Parameters.Add(new SqlParameter("@CreatedBy", request.CreatedBy ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@UpdatedBy", request.UpdatedBy ?? (object)DBNull.Value));
                 command.Parameters.Add(new SqlParameter("@SacCode", request.SacCode ?? (object)DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@StorageType", request.StorageType ?? (object)DBNull.Value));
                 using var reader = await command.ExecuteReaderAsync();
 
                 if (await reader.ReadAsync())
@@ -1314,7 +1316,7 @@ namespace SezApi.Services
         }
 
 
-        public async Task<ResponseHandlingCharge?> GetHandlingChargesCalcAsync(string customType, string receiptNo, int partyId)
+        public async Task<ResponseHandlingCharge?> GetHandlingChargesCalcAsync(string customType, string receiptNo, int partyId, string StorageType)
         {
             using var conn = _db.Database.GetDbConnection();
             await conn.OpenAsync();
@@ -1326,6 +1328,7 @@ namespace SezApi.Services
             command.Parameters.Add(new SqlParameter("@CustomType", customType));
             command.Parameters.Add(new SqlParameter("@ReceiptNo", receiptNo));
             command.Parameters.Add(new SqlParameter("@PartyId", partyId));
+            command.Parameters.Add(new SqlParameter("@StorageType", StorageType ?? (object)DBNull.Value));
 
             using var reader = await command.ExecuteReaderAsync();
 
