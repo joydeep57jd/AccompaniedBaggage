@@ -17,5 +17,7 @@
         public decimal? Length { get; set; }
         public decimal? Height { get; set; }
         public DateTime? ExaminationDate { get; set; }
+
+        public decimal? Width { get; set; }
     }
 }

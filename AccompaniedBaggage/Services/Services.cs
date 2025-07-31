@@ -1708,7 +1708,8 @@ namespace SezApi.Services
                         StoredLocation = reader["Stored_location"]?.ToString(),
                         Length = reader["Length"] as decimal?,
                         Height = reader["Height"] as decimal?,
-                        ExaminationDate = reader["Examination_date"] as DateTime?
+                        ExaminationDate = reader["Examination_date"] as DateTime?,
+                        Width = reader["Width"] as decimal?
                     });
                 }
 
