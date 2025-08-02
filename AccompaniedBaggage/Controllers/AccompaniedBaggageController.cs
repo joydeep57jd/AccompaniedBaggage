@@ -451,5 +451,20 @@ namespace SezApi.Controllers
             }
         }
 
+
+        [HttpPost("CancellInoive")]
+        public async Task<IActionResult> CancellInoive(RequestCanceLinvoice reqInv)
+        {
+            var result = await _services.CancelInvoiceAsync(reqInv);
+            return Ok(result);
+        }
+
+        [HttpGet("GetCancellInoive")]
+        public async Task<IActionResult> GetCancellInoive(int? id, int? page, int? size, string? InvoiceNo)
+        {
+            var result = await _services.GetCancelInvoiceAsync(id, page, size, InvoiceNo);
+            return Ok(result);
+        }
+
     }
 }

@@ -19,5 +19,7 @@
         public string? UpdatedBy { get; set; }
 
         public DateTime? ReceiptDate { get; set; }
+
+        public string? Cargo_type { get; set; } 
     }
 }

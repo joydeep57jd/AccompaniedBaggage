@@ -47,5 +47,9 @@ namespace SezApi.Services
     DateTime? toReceiptDate,
     DateTime? fromExaminationDate,
     DateTime? toExaminationDate);
+
+        Task<Response<AddEditResponse>> CancelInvoiceAsync(RequestCanceLinvoice request);
+
+        Task<Response<List<ResponseCanceLinvoice>>> GetCancelInvoiceAsync(int? id, int? page, int? size, string? InvoiceNo);
     }
 }

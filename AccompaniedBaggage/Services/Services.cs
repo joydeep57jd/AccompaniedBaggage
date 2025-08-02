@@ -1174,7 +1174,8 @@ namespace SezApi.Services
                         UpdatedDate = reader["UpdatedDate"] as DateTime?,
                         CreatedBy = reader["CreatedBy"] as string,
                         UpdatedBy = reader["UpdatedBy"] as string,
-                        ReceiptDate = reader["ReceiptDate"] as DateTime?
+                        ReceiptDate = reader["ReceiptDate"] as DateTime?,
+                        Cargo_type = reader["Cargo_type"] as string,
                     });
                 }
 
@@ -1731,6 +1732,133 @@ namespace SezApi.Services
 
             return response;
         }
+
+        public async Task<Response<AddEditResponse>> CancelInvoiceAsync(RequestCanceLinvoice request)
+        {
+            var response = new Response<AddEditResponse>();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "SP_AddEditCanceLinvoice";
+                command.CommandType = CommandType.StoredProcedure;
+
+                void AddParam(string name, object? value)
+                {
+                    var param = command.CreateParameter();
+                    param.ParameterName = name;
+                    param.Value = value ?? DBNull.Value;
+                    command.Parameters.Add(param);
+                }
+
+                AddParam("@Id", request.Id ?? 0);
+                AddParam("@invId", request.invId);
+                AddParam("@InvoiceNo", request.InvoiceNo);
+                AddParam("@Remarks", request.Remarks);
+                AddParam("@cancelReason", request.cancelReason);
+                AddParam("@CancelledDate", request.CancelledDate);
+                AddParam("@Amount", request.Amount);
+
+                var outputParam = command.CreateParameter();
+                outputParam.ParameterName = "@Response";
+                outputParam.DbType = DbType.String;
+                outputParam.Size = 100;
+                outputParam.Direction = ParameterDirection.Output;
+                command.Parameters.Add(outputParam);
+
+                await command.ExecuteNonQueryAsync();
+
+                response.Data = new AddEditResponse
+                {
+                    Response = outputParam.Value?.ToString()
+                };
+                response.Status = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in CancelInvoiceAsync: {Message}", ex.Message);
+
+                response.Data = new AddEditResponse
+                {
+                    Response = $"Error: {ex.Message}"
+                };
+                response.Status = false;
+            }
+
+            return response;
+        }
+
+        public async Task<Response<List<ResponseCanceLinvoice>>> GetCancelInvoiceAsync(int? id, int? page, int? size, string? invoiceNo)
+        {
+            var response = new Response<List<ResponseCanceLinvoice>>();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "GetCancelInvoice";
+                command.CommandType = CommandType.StoredProcedure;
+
+                void AddParam(string name, object? value)
+                {
+                    var param = command.CreateParameter();
+                    param.ParameterName = name;
+                    param.Value = value ?? DBNull.Value;
+                    command.Parameters.Add(param);
+                }
+
+                AddParam("@Id", id);
+                AddParam("@page", page);
+                AddParam("@size", size);
+                AddParam("@ForDelhivery", string.IsNullOrEmpty(invoiceNo) ? DBNull.Value : 1);
+
+                using var reader = await command.ExecuteReaderAsync();
+
+                int totalCount = 0;
+                if (await reader.ReadAsync())
+                {
+                    totalCount = reader.GetInt32(0);
+                }
+
+                await reader.NextResultAsync();
+
+                var data = new List<ResponseCanceLinvoice>();
+                while (await reader.ReadAsync())
+                {
+                    data.Add(new ResponseCanceLinvoice
+                    {
+                        Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                        InvId = reader["invId"] as int?,
+                        InvoiceNo = reader["InvoiceNo"] as string,
+                        Remarks = reader["Remarks"] as string,
+                        cancelReason = reader["cancelReason"] as string,
+                        CancelledDate = reader["CancelledDate"] as DateTime?,
+                        Amount = reader["Amount"] as string,
+                        invoiceDate = reader["invoiceDate"] as DateTime?,
+                        PartyName = reader["PartyName"] as string
+                    });
+                }
+
+                response.Data = data;
+                response.TotalCount = totalCount;
+                response.Status = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in GetCancelInvoiceAsync: {Message}", ex.Message);
+                response.Status = false;
+                response.Message = $"Error: {ex.Message}";
+                response.Data = new List<ResponseCanceLinvoice>();
+            }
+
+            return response;
+        }
+
 
     }
 }
