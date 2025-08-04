@@ -51,5 +51,11 @@ namespace SezApi.Services
         Task<Response<AddEditResponse>> CancelInvoiceAsync(RequestCanceLinvoice request);
 
         Task<Response<List<ResponseCanceLinvoice>>> GetCancelInvoiceAsync(int? id, int? page, int? size, string? InvoiceNo);
+
+        Task<AddEditResponse> CreateCreditNoteAsync(RequestCreditNote request);
+
+        Task<Response<List<CreditNote>>> GetCreditNoteList(int? id, int? page, int? size, string? creditNoteNo);
+
+        Task<Response<List<CreditNoteDetail>>> GetCreditNoteDetailList(int? creditNoteDetailId, int? creditNoteId, int? page, int? size);
     }
 }

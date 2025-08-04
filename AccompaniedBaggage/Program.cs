@@ -1,7 +1,8 @@
+using AccompaniedBaggage.Services;
 using Microsoft.EntityFrameworkCore;
+using Serilog;
 using SezApi.Data;
 using SezApi.Services;
-using Serilog;
 using System;
 
 var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Logs", $"log-{DateTime.Now:yyyyMMdd_HHmmss}.txt");
@@ -17,7 +18,7 @@ Log.Logger = new LoggerConfiguration()
 try
 {
     var builder = WebApplication.CreateBuilder(args);
-
+   
     //For seriLog
     builder.Host.UseSerilog();
 
@@ -26,11 +27,14 @@ try
         options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
     builder.Services.AddScoped<IServices, Services>();
-
+ 
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
-
+    builder.Services.AddHttpClient<CWCservice>(client =>
+    {
+        client.Timeout = TimeSpan.FromMinutes(2);
+    });
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("AllowAll", policy =>

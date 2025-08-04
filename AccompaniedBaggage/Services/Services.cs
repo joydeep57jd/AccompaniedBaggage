@@ -1,23 +1,25 @@
 ﻿using AccompaniedBaggage.Model.Request;
 using AccompaniedBaggage.Model.Response;
-using Azure.Core;
+using AccompaniedBaggage.Services;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using SezApi.Controllers;
 using SezApi.Data;
 using SezApi.Model.Request;
 using SezApi.Model.Response;
 using System.Data;
+using System.Data.Common;
 namespace SezApi.Services
 {
     public class Services : IServices
     {
         private readonly AccompaniedBaggageDbContext _db;
         private readonly ILogger<Services> _logger;
-        public Services(AccompaniedBaggageDbContext db, ILogger<Services> logger)
+        private readonly CWCservice _cwcService;
+        public Services(AccompaniedBaggageDbContext db, ILogger<Services> logger, CWCservice cwcService)
         {
             _db = db;
             _logger = logger;
+            _cwcService = cwcService;
         }
 
         public async Task<Response<List<ResponseMstEximTraderMaster>>> GetMstParty(int? page, int? size, string? partyType)
@@ -957,13 +959,14 @@ namespace SezApi.Services
                 AddParam("@UpdatedBy", request.UpdatedBy);
 
                 int insertedId = 0;
-
+                string claimNo = string.Empty;  
                 // Execute reader
                 using (var reader = await command.ExecuteReaderAsync())
                 {
                     if (await reader.ReadAsync())
                     {
                         insertedId = Convert.ToInt32(reader["Claim_id"]);
+                        claimNo = reader["Claim_no"] as string ?? string.Empty;
                     }
                 } // Reader automatically closed here
 
@@ -978,6 +981,16 @@ namespace SezApi.Services
                     chargesCmd.Parameters.Add(new SqlParameter("@jsonData", request.jsonData));
 
                     await chargesCmd.ExecuteNonQueryAsync();
+                }
+
+                if(insertedId == 0)
+                {
+                    GetInvoiceDtlforSAPRequest request1 = new GetInvoiceDtlforSAPRequest
+                    {
+                        InvoiceNo = request.Claim_no,
+                        IsIRN = 1
+                    };
+                  var invoiceResponse = await _cwcService.GetInvoiceDataFromSPAsync(request1, insertedId);
                 }
 
                 var outputClaimNo = claimNoParam.Value?.ToString();
@@ -1858,6 +1871,232 @@ namespace SezApi.Services
 
             return response;
         }
+
+        public async Task<AddEditResponse> CreateCreditNoteAsync(RequestCreditNote request)
+        {
+            var response = new AddEditResponse();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var transaction = await conn.BeginTransactionAsync();
+                using var command = conn.CreateCommand();
+
+                command.Transaction = (DbTransaction)transaction;
+                command.CommandText = "sp_Insert_CreditNote";
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.Parameters.Add(new SqlParameter("@CreditNoteId", request.CreditNoteId));
+                command.Parameters.Add(new SqlParameter("@TaxInvoice", (object?)request.TaxInvoice ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@BillOfSupply", (object?)request.BillOfSupply ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@InvoiceNo", (object?)request.InvoiceNo ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@CreditNoteDate", (object?)request.CreditNoteDate ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@CreditNoteNo", (object?)request.CreditNoteNo ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@PartyId", (object?)request.PartyId ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@PayeeId", (object?)request.PayeeId ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@GSTNo", (object?)request.GSTNo ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@PlaceOfSupply", (object?)request.PlaceOfSupply ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@CreatedBy", (object?)request.CreatedBy ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@UpdatedBy", (object?)request.UpdatedBy ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@Remarks", (object?)request.Remarks ?? DBNull.Value));
+
+                var outputId = new SqlParameter("@NewCreditNoteId", SqlDbType.BigInt)
+                {
+                    Direction = ParameterDirection.Output
+                };
+                command.Parameters.Add(outputId);
+
+                await command.ExecuteNonQueryAsync();
+
+                long newCreditNoteId = (long)outputId.Value;
+
+                // Step 2: Insert XML detail using sp_Insert_CreditNoteDetail_XML
+                string xmlData = XmlConvertercs.ConvertToXmlCreditNoteDetail(request.CreditNoteDetailList);
+
+                using var detailCommand = conn.CreateCommand();
+                detailCommand.Transaction = (DbTransaction)transaction;
+                detailCommand.CommandText = "sp_Insert_CreditNoteDetail_XML";
+                detailCommand.CommandType = CommandType.StoredProcedure;
+                detailCommand.Parameters.Add(new SqlParameter("@CreditNoteId", newCreditNoteId));
+                detailCommand.Parameters.Add(new SqlParameter("@XmlData", xmlData));
+
+                await detailCommand.ExecuteNonQueryAsync();
+
+                await transaction.CommitAsync();
+
+                response.Response = $"CreditNote saved successfully. CreditNoteId: {newCreditNoteId}";
+
+                // Step 3: Get CreditNoteNo (from DB directly via stored procedure)
+                //using var getCreditNoteCommand = conn.CreateCommand();
+                //getCreditNoteCommand.CommandText = "sp_Get_CreditNoteNo_ById"; 
+                //getCreditNoteCommand.CommandType = CommandType.StoredProcedure;
+                //getCreditNoteCommand.Parameters.Add(new SqlParameter("@CreditNoteId", newCreditNoteId));
+
+                //string creditNoteNo = "";
+
+                //using var reader = await getCreditNoteCommand.ExecuteReaderAsync();
+                //if (await reader.ReadAsync())
+                //{
+                //    creditNoteNo = reader["CreditNoteNo"]?.ToString();
+                //}
+
+                //var GetCreditNoteforSAPRequest = new GetCreditNoteforSAPRequest
+                //{
+                //    inInvoiceNo = creditNoteNo,
+                //    IsIRN = 1,
+                //};
+
+                //var sapResponse = await _cwcService.GetCreditNoteDataFromSPAsync(GetCreditNoteforSAPRequest, (int)newCreditNoteId);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in CreateCreditNoteAsync: {Message}", ex.Message);
+                throw new ApplicationException("An error occurred while saving CreditNote.", ex);
+            }
+        }
+
+        public async Task<Response<List<CreditNote>>> GetCreditNoteList(int? id, int? page, int? size, string? creditNoteNo)
+        {
+            var response = new Response<List<CreditNote>>();
+            var resultList = new List<CreditNote>();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "sp_Get_CreditNoteList";
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.Parameters.Add(new SqlParameter("@Id", (object?)id ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@Page", (object?)page ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@Size", (object?)size ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@CreditNoteNo", (object?)creditNoteNo ?? DBNull.Value));
+
+                using var reader = await command.ExecuteReaderAsync();
+
+                while (await reader.ReadAsync())
+                {
+                    var creditNote = new CreditNote
+                    {
+                        CreditNoteId = Convert.ToInt32(reader["CreditNoteId"]),
+                        CreditNoteNo = reader["CreditNoteNo"].ToString(),
+                        TaxInvoice = reader.GetBoolean(reader.GetOrdinal("TaxInvoice")),
+                        BillOfSupply = reader.GetBoolean(reader.GetOrdinal("BillOfSupply")),
+                        InvoiceNo = reader["InvoiceNo"].ToString(),
+                        CreditNoteDate = reader.GetDateTime(reader.GetOrdinal("CreditNoteDate")),
+                        PartyId = reader.GetInt32(reader.GetOrdinal("PartyId")),
+                        PayeeId = reader.GetInt32(reader.GetOrdinal("PayeeId")),
+                        GSTNo = reader["GSTNo"].ToString(),
+                        PlaceOfSupply = reader["PlaceOfSupply"].ToString(),
+                        CreatedBy = reader.GetInt32(reader.GetOrdinal("CreatedBy")),
+                        UpdatedBy = reader.GetInt32(reader.GetOrdinal("UpdatedBy")),
+                        CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+                        UpdatedAt = reader.GetDateTime(reader.GetOrdinal("UpdatedAt")),
+                        Remarks = reader["Remarks"].ToString(),
+                        SAP_DOC_NUMBER = reader["SAP_DOC_NUMBER"]?.ToString(),
+                        IsSAP = reader.GetInt32(reader.GetOrdinal("IsSAP")),
+                        Taxable_Amt = reader.GetDecimal(reader.GetOrdinal("Taxable_Amt")),
+                        IGST_Amt = reader.GetDecimal(reader.GetOrdinal("IGST_Amt")),
+                        CGST_Amt = reader.GetDecimal(reader.GetOrdinal("CGST_Amt")),
+                        SGST_Amt = reader.GetDecimal(reader.GetOrdinal("SGST_Amt")),
+                        Total_Amt = reader.GetDecimal(reader.GetOrdinal("Total_Amt")),
+                        Roundoff_Amt = reader.GetDecimal(reader.GetOrdinal("Roundoff_Amt")),
+                        Net_Amt = reader.GetDecimal(reader.GetOrdinal("Net_Amt")),
+                    };
+                    resultList.Add(creditNote);
+                }
+
+                if (await reader.NextResultAsync() && await reader.ReadAsync())
+                {
+                    response.TotalCount = Convert.ToInt32(reader["TotalCount"]);
+                }
+
+                response.Data = resultList;
+                response.Status = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in GetCreditNoteList: {Message}", ex.Message);
+                response.Status = false;
+                response.Message = ex.Message;
+                response.Data = new List<CreditNote>();
+            }
+
+            return response;
+        }
+
+        public async Task<Response<List<CreditNoteDetail>>> GetCreditNoteDetailList(int? creditNoteDetailId, int? creditNoteId, int? page, int? size)
+        {
+            var response = new Response<List<CreditNoteDetail>>();
+            var resultList = new List<CreditNoteDetail>();
+
+            try
+            {
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+
+                using var command = conn.CreateCommand();
+                command.CommandText = "sp_Get_CreditNoteDetailList";
+                command.CommandType = CommandType.StoredProcedure;
+
+                command.Parameters.Add(new SqlParameter("@CreditNoteDetailId", (object?)creditNoteDetailId ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@CreditNoteId", (object?)creditNoteId ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@Page", (object?)page ?? DBNull.Value));
+                command.Parameters.Add(new SqlParameter("@Size", (object?)size ?? DBNull.Value));
+
+                using var reader = await command.ExecuteReaderAsync();
+
+                while (await reader.ReadAsync())
+                {
+                    var detail = new CreditNoteDetail
+                    {
+                        CreditNoteDetailId = Convert.ToInt32(reader["CreditNoteDetailId"]),
+                        CreditNoteId = Convert.ToInt32(reader["CreditNoteId"]),
+                        ChargesTypeId = Convert.ToInt32(reader["ChargesTypeId"]),
+                        ChargeType = reader["ChargeType"]?.ToString(),
+                        ChargeName = reader["ChargeName"]?.ToString(),
+                        SACCode = reader["SACCode"]?.ToString(),
+                        Quantity = reader["Quantity"] as int?,
+                        Rate = reader["Rate"] as decimal?,
+                        Inv_Amount = reader["Inv_Amount"] as decimal?,
+                        Taxable = reader["Taxable"] as decimal?,
+                        IGSTPer = reader["IGSTPer"] as decimal?,
+                        IGSTAmt = reader["IGSTAmt"] as decimal?,
+                        CGSTPer = reader["CGSTPer"] as decimal?,
+                        CGSTAmt = reader["CGSTAmt"] as decimal?,
+
+                        SGSTPer = reader["SGSTPer"] as decimal?,
+                        SGSTAmt = reader["SGSTAmt"] as decimal?,
+                        Total = reader["Total"] as decimal?,
+                        IsActive = reader.GetBoolean(reader.GetOrdinal("IsActive")),
+                    };
+                    resultList.Add(detail);
+                }
+
+                if (await reader.NextResultAsync() && await reader.ReadAsync())
+                {
+                    response.TotalCount = Convert.ToInt32(reader["TotalCount"]);
+                }
+
+                response.Data = resultList;
+                response.Status = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error in GetCreditNoteDetailList: {Message}", ex.Message);
+                response.Status = false;
+                response.Message = ex.Message;
+                response.Data = new List<CreditNoteDetail>();
+            }
+
+            return response;
+        }
+
 
 
     }
