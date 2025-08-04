@@ -72,7 +72,7 @@ namespace AccompaniedBaggage.Services
 
                 await using var conn = _dbContext.Database.GetDbConnection();
                 await using var cmd = conn.CreateCommand();
-                if (conn.State != System.Data.ConnectionState.Closed)
+                if (conn.State != ConnectionState.Closed)
                     await conn.CloseAsync();
                 cmd.CommandText = "GetInvoiceDtlforSAP";
                 cmd.CommandType = CommandType.StoredProcedure;
@@ -156,7 +156,7 @@ namespace AccompaniedBaggage.Services
                 }
                 finally
                 {
-                    if (conn.State != System.Data.ConnectionState.Closed)
+                    if (conn.State != ConnectionState.Closed)
                         await conn.CloseAsync();
                 }
 
@@ -197,7 +197,7 @@ namespace AccompaniedBaggage.Services
                         }
                         finally
                         {
-                            if (saveConn.State != System.Data.ConnectionState.Closed)
+                            if (saveConn.State != ConnectionState.Closed)
                                 await saveConn.CloseAsync();
                         }
 
@@ -219,7 +219,7 @@ namespace AccompaniedBaggage.Services
                             }
                             finally
                             {
-                                if (updConn.State != System.Data.ConnectionState.Closed)
+                                if (updConn.State != ConnectionState.Closed)
                                     await updConn.CloseAsync();
                             }
                         }
