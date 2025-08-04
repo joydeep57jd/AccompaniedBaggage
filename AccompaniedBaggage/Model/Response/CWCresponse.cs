@@ -38,4 +38,11 @@ namespace AccompaniedBaggage.Model.Response
         public string InvoiceNo { get; set; }
         public int IsIRN { get; set; }
     }
+
+    public class GetCashReceiptDtlforSAPRequest
+    {
+        public string inReceiptNo { get; set; }
+        public int IsIRN { get; set; }
+        //public bool YardInvoice { get; set; }
+    }
 }

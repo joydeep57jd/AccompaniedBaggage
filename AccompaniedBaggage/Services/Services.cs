@@ -821,17 +821,28 @@ namespace SezApi.Services
                 AddParameter("@UpdatedBy", request.UpdatedBy);
 
                 int resultId = 0;
-
+                string ReceiptNo = string.Empty;
                 using var reader = await command.ExecuteReaderAsync();
                 if (await reader.ReadAsync())
                 {
                     resultId = Convert.ToInt32(reader[0]);
+                    ReceiptNo = reader["ReceiptNo"] as string ?? string.Empty;
                 }
 
                 response.Data = new AddEditResponse
                 {
                     Response = request.ReceiptId == 0 ? "Inserted successfully" : "Updated successfully"
                 };
+
+                if(resultId != 0)
+                {
+                    GetCashReceiptDtlforSAPRequest request1 = new GetCashReceiptDtlforSAPRequest
+                    {
+                        inReceiptNo = ReceiptNo,
+                        IsIRN = 1
+                    };
+                    var invoiceResponse = await _cwcService.GetReceiptDataFromSPAsync(request1, resultId);
+                }
                 response.Status = true;
             }
             catch (Exception ex)
