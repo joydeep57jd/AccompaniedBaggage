@@ -983,11 +983,11 @@ namespace SezApi.Services
                     await chargesCmd.ExecuteNonQueryAsync();
                 }
 
-                if(insertedId == 0)
+                if(insertedId != 0)
                 {
                     GetInvoiceDtlforSAPRequest request1 = new GetInvoiceDtlforSAPRequest
                     {
-                        InvoiceNo = request.Claim_no,
+                        InvoiceNo = claimNo,
                         IsIRN = 1
                     };
                   var invoiceResponse = await _cwcService.GetInvoiceDataFromSPAsync(request1, insertedId);
