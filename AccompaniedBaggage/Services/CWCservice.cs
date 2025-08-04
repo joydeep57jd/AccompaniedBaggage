@@ -62,6 +62,7 @@ namespace AccompaniedBaggage.Services
         public async Task<AddEditResponse> GetInvoiceDataFromSPAsync(GetInvoiceDtlforSAPRequest request, int invId)
         {
             AddEditResponse response = new AddEditResponse();
+
             try
             {
                 var model = new RequestCWCapi
@@ -71,7 +72,8 @@ namespace AccompaniedBaggage.Services
 
                 await using var conn = _dbContext.Database.GetDbConnection();
                 await using var cmd = conn.CreateCommand();
-
+                if (conn.State != System.Data.ConnectionState.Closed)
+                    await conn.CloseAsync();
                 cmd.CommandText = "GetInvoiceDtlforSAP";
                 cmd.CommandType = CommandType.StoredProcedure;
 
