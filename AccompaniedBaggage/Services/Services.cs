@@ -832,17 +832,7 @@ namespace SezApi.Services
                 response.Data = new AddEditResponse
                 {
                     Response = request.ReceiptId == 0 ? "Inserted successfully" : "Updated successfully"
-                };
-
-                if(resultId != 0)
-                {
-                    GetCashReceiptDtlforSAPRequest request1 = new GetCashReceiptDtlforSAPRequest
-                    {
-                        inReceiptNo = ReceiptNo,
-                        IsIRN = 1
-                    };
-                    var invoiceResponse = await _cwcService.GetReceiptDataFromSPAsync(request1, resultId);
-                }
+                };                
                 response.Status = true;
             }
             catch (Exception ex)
@@ -1081,6 +1071,17 @@ namespace SezApi.Services
                     // ReceiptNo = outputReceiptNo,
                     Response = request.ReceiptId == 0 ? $"Inserted successfully Id = {insertedId} , ReceiptNo= {outputReceiptNo}" : "Updated successfully"
                 };
+
+                if (insertedId != 0)
+                {
+                    GetCashReceiptDtlforSAPRequest request1 = new GetCashReceiptDtlforSAPRequest
+                    {
+                        inReceiptNo = outputReceiptNo,
+                        IsIRN = 1
+                    };
+                    var invoiceResponse = await _cwcService.GetReceiptDataFromSPAsync(request1, insertedId);
+                }
+
                 response.Status = true;
             }
             catch (Exception ex)
